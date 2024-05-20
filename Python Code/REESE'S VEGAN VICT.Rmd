@@ -1,0 +1,219 @@
+---
+title: "REESE'S VEGAN VICTORY"
+output: html_document
+date: "2024-05-01"
+---
+```{r}
+library(ggplot2)
+library(dplyr)
+library(data.table)
+library(sets)
+library(stringr)
+library(tidyr)
+library(stargazer)
+```
+
+```{r}
+neighbor_county_updated = read.csv("C:/Users/reese/OneDrive/Documents/Research/Mom project 1/Data/neighbor_county_updated.csv")
+head(neighbor_county_updated, 10)
+```
+```{r}
+usda_w_pop_and_area = read.csv("C:/Users/reese/OneDrive/Documents/Research/Mom project 1/Data/usda_w_pop_and_area.csv")
+usda_w_pop_and_area$region <- gsub("_", " ", usda_w_pop_and_area$region)
+usda_w_pop_and_area$subregion <- gsub("_", "", usda_w_pop_and_area$subregion)
+usda_w_pop_and_area$subregion <- gsub("\\.", "", usda_w_pop_and_area$subregion)
+usda_w_pop_and_area$subregion <- gsub(" ", "", usda_w_pop_and_area$subregion)
+usda_w_pop_and_area$subregion <- gsub("'", "", usda_w_pop_and_area$subregion)
+head(usda_w_pop_and_area, 10)
+```'
+
+
+```{r}
+neighbor_county_filtered <- neighbor_county_updated[!(neighbor_county_updated$state == neighbor_county_updated$neighboring_state & neighbor_county_updated$county == neighbor_county_updated$neighboring_county), ]
+
+usda_w_pop_and_area_simplified = dplyr::select(usda_w_pop_and_area, "region", 
+                                        "subregion", 
+                                        "Population..2020.census.", 
+                                        "Area..mi.2.",
+                                        "cattle.farms",
+                                        "cattle.count",
+                                        "hog.farm",
+                                        "hog.count",
+                                        "sheep.farm",
+                                        "sheep.count",
+                                        "broiler.farm",
+                                        "broiler.count",
+                                        "layer.farm",
+                                        "layer.count")
+
+usda_w_pop_and_area_simplified = usda_w_pop_and_area_simplified[!duplicated(usda_w_pop_and_area_simplified), ]
+
+```
+
+# Sheep
+
+```{r}
+neighboring_count =  merge(
+  neighbor_county_updated,
+  usda_w_pop_and_area_simplified, 
+  by.x = c('neighboring_state', 'neighboring_county'),
+  by.y = c('region', 'subregion'),
+  all = TRUE  
+)
+
+neighboring_count$sheep.count <- as.integer(gsub(-47, 0, neighboring_count$sheep.count))
+
+neighboring_count$sheep.count[is.na(neighboring_count$sheep.count)] <- 0
+
+neighboring_count$Area..mi.2. <- ifelse(neighboring_count$sheep.count == 0, 0, neighboring_count$Area..mi.2.)
+
+neighboring_count_summed <- neighboring_count %>%
+  group_by(state, county) %>%
+  summarise(pop_summed = sum(`Population..2020.census.`),
+            area_summed = sum(`Area..mi.2.`),
+            sheep_farms_summed = sum(sheep.farm),
+            sheep_count_summed = sum(sheep.count)
+            )
+neighboring_count_summed$county <- gsub("oglaladakota", "oglalalakota", neighboring_count_summed$county)
+neighboring_count_summed
+```
+
+```{r}
+linear_model_data_sheep = merge(
+  neighboring_count_summed,
+  usda_w_pop_and_area_simplified, 
+  by.x = c('state', 'county'),
+  by.y = c('region', 'subregion'),
+  all = TRUE  
+)
+
+linear_model_data_sheep = merge(
+  linear_model_data_sheep,
+  state_subset,
+  by.x = c('state'),
+  by.y = c('state')
+)
+
+head(linear_model_data_sheep, 10)
+```
+## LOOK HERE MOM
+
+```{r}
+linear_model_sheep_data = linear_model_data_sheep[linear_model_data_sheep$sheep.count.x != -47, ]
+linear_model_sheep_data = linear_model_sheep_data[complete.cases(linear_model_sheep_data["state"]), ]
+linear_model_sheep = glm.nb(sheep.count.x ~ pop_summed + area_summed + sheep_count_summed + Population..2020.census. + Area..mi.2. + sheep.farm.x + sheep.count.y,  data = linear_model_sheep_data, maxit = 1000)
+stargazer(
+  linear_model_sheep,
+  type = 'text', 
+  covariate.labels = c(
+    'Surrounding Population', 'Surrounding Area', 'Surrounding Sheep Count', "County Population", "County Area", "Sheep Farms", "Total State Sheep Count"
+    )
+)
+
+testing_sheep_data = linear_model_data_sheep[linear_model_data_sheep$sheep.count.x == -47, ]
+predicting_sheep_data = testing_sheep_data[ , !(names(testing_sheep_data) == "sheep.count.x")]
+
+predicting_sheep_data$sheep.count.x = predict(linear_model_sheep, newdata = predicting_sheep_data, type = "response")
+predicting_sheep_data = predicting_sheep_data[complete.cases(predicting_sheep_data["state"]), ]
+predicting_sheep_data
+
+```
+
+```{r}
+concat = rbind(linear_model_sheep_data, predicting_sheep_data)
+
+counties <- map_data("county")
+counties$subregion[is.na(counties$subregion)] <- "none"
+counties$subregion <- gsub(" ", "", counties$subregion)
+
+county_subset_map <- merge(counties, concat, sort = FALSE, by.x = c('region', 'subregion'), by.y = c('state', 'county.x'), all = TRUE)
+county_subset_map <- county_subset_map[order(county_subset_map$order), ]
+
+count_variables <- c("hog.count", "cattle.count", "broiler.count", "layer.count", "sheep.count")
+
+plot_title <- gsub("\\.", " ", count_variables["sheep.count.x"]) 
+p <- ggplot(county_subset_map, aes(long, lat)) +
+  geom_polygon(aes(group = group, fill = get("sheep.count.x"))) +
+  geom_path(data = state_subset_map, aes(long, lat, group = group), color = "black") +
+  coord_map("albers",  lat0 = 45.5, lat1 = 29.5) +
+  labs(title = "Sheep Count Filled", fill = "Count")  
+
+print(p)
+```
+
+# Hog
+
+```{r}
+neighboring_count =  merge(
+  neighbor_county_updated,
+  usda_w_pop_and_area_simplified, 
+  by.x = c('neighboring_state', 'neighboring_county'),
+  by.y = c('region', 'subregion'),
+  all = TRUE  
+)
+
+neighboring_count$hog.count <- as.integer(gsub(-47, 0, neighboring_count$hog.count))
+
+neighboring_count$hog.count[is.na(neighboring_count$hog.count)] <- 0
+
+neighboring_count$Area..mi.2. <- ifelse(neighboring_count$hog.count == 0, 0, neighboring_count$Area..mi.2.)
+
+neighboring_count_summed <- neighboring_count %>%
+  group_by(state, county) %>%
+  summarise(pop_summed = sum(`Population..2020.census.`),
+            area_summed = sum(`Area..mi.2.`),
+            hog_farm_summed = sum(hog.farm),
+            hog_count_summed = sum(hog.count)
+            )
+neighboring_count_summed$county <- gsub("oglaladakota", "oglalalakota", neighboring_count_summed$county)
+neighboring_count_summed
+```
+```{r}
+linear_model_data_hog = merge(
+  neighboring_count_summed,
+  usda_w_pop_and_area_simplified, 
+  by.x = c('state', 'county'),
+  by.y = c('region', 'subregion'),
+  all = TRUE  
+)
+
+linear_model_data_hog = merge(
+  linear_model_data_hog,
+  state_subset,
+  by.x = c('state'),
+  by.y = c('state')
+)
+
+head(linear_model_data_hog, 10)
+```
+```{r}
+linear_model_hog_data = linear_model_data_hog[linear_model_data_hog$hog.count.x != -47, 
+linear_model_hog_data = linear_model_hog_data[complete.cases(linear_model_hog_data["state"]), ]
+start_values <- list(theta = 1, 
+                      beta = c(0, 0, 0, 0, 0, 0, 0, 0))  # Provide starting values for each coefficient
+linear_model_hog = glm.nb(hog.count.x ~ pop_summed + area_summed + hog_count_summed + Population..2020.census. + Area..mi.2. + hog.farm.x + hog.count.y,  
+                          data = linear_model_hog_data, 
+                          maxit = 100000, 
+                          start = start_values)
+
+stargazer(
+  linear_model_hog,
+  type = 'text', 
+  covariate.labels = c(
+    'Surrounding Population', 'Surrounding Area', 'Surrounding Sheep Count', "County Population", "County Area", "Sheep Farms", "Total State Sheep Count"
+    )
+)
+
+testing_hog_data = linear_model_data_hog[linear_model_data_hog$hog.count.x == -47, ]
+predicting_hog_data = testing_hog_data[ , !(names(testing_hog_data) == "hog.count.x")]
+
+predicting_hog_data$hog.count.x = predict(linear_model_hog, newdata = predicting_hog_data, type = "response")
+predicting_hog_data = predicting_hog_data[complete.cases(predicting_hog_data["state"]), ]
+predicting_hog_data
+
+```
+```{r}
+  state_subset
+```
+
+
