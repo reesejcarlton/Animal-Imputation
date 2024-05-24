@@ -1,11 +1,11 @@
 ---
 title: "CAFO's Imputing Maps"
-output: html_document
+output: pdf_document
 date: "2024-05-13"
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(include = FALSE, message = FALSE, warning = FALSE )
 ```
 
 ```{r}
@@ -21,7 +21,7 @@ library(pscl)
 ```
 
 
-##Procedure
+## Procedure
 
 In order to build the model to impute the missing values we began with reading in the 2022 USDA: Census of Agriculture ("https://www.nass.usda.gov/Publications/AgCensus/2022/Full_Report/Volume_1,_Chapter_2_County_Level/"). Using python's request library, I looped through the agricultural census data for each state, scraping the relevant animal and farm counts for each county and state total.
 
@@ -33,7 +33,7 @@ To find the data on surrounding counties, the County Adjacency File ("https://ww
 
 The two linear models we looked into were the Negative Binomial Linear Regression model and the Poisson Linear Regression Model. Both of these models excel for count data as they are limited to not be zero. The Poisson Linear Regression model makes the assumption that the data's mean roughly equal the data's variance, with the ability to handle the large number of counties that have zero animals. On the other handle, Negative Binomial Linear Regression doesn't require the assumption of the data's mean equaling its variance, as it has an over dispersion term to control the extent of the variation.
 
-##Map Plots
+## Map Plots
 ```{r}
 usda_data = read.csv("../Data/usda_data.csv")
 
