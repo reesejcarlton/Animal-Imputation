@@ -21341,3 +21341,39 @@ fairfield,connecticut,litchfield,connecticut
 fairfield,connecticut,dutchess,new york
 fairfield,connecticut,westchester,new york
 fairfield,connecticut,putnam,new york
+suffolk,virginia,gates,north carolina
+suffolk,virginia,southampton,virginia
+suffolk,virginia,camden,north carolina
+suffolk,virginia,isleofwight,virginia
+suffolk,virginia,newportnews,virginia
+newportnews,virginia,suffolk,virginia
+newportnews,virginia,york,virginia
+newportnews,virginia,isleofwight,virginia
+newportnews,virginia,surry,virginia
+newportnews,virginia,jamescity,virginia
+newportnews,virginia,hampton,virginia
+norfolk,virginia,northampton,virginia
+norfolk,virginia,hampton,virginia
+norfolk,virginia,virginiabeach,virginia
+norfolk,virginia,york,virginia
+hampton,virginia,northampton,virginia
+hampton,virginia,virginiabeach,virginia
+hampton,virginia,newportnews,virginia
+hampton,virginia,norfolk,virginia
+virginiabeach,virginia,northampton,virginia
+virginiabeach,virginia,currituck,north carolina
+virginiabeach,virginia,norfolk,virginia
+virginiabeach,virginia,hampton,virginia
+currituck,north carolina,virginiabeach,virginia
+northampton,virginia,virginiabeach,virginia
+northampton,virginia,hampton,virginia
+northampton,virginia,norfolk,virginia
+gates,north carolina,suffolk,virginia
+camden,north carolina,suffolk,virginia
+isleofwight,virginia,suffolk,virginia
+isleofwight,virginia,newportnews,virginia
+southampton,virginia,suffolk,virginia
+york,virginia,norfolk,virginia
+york,virginia,newportnews,virginia
+surry,virginia,newportnews,virginia
+jamescity,virginia,newportnews,virginia

@@ -20,9 +20,9 @@ library(stargazer)
 
 
 ```{r}
-usda_data = read.csv("C:/Users/reese/OneDrive/Documents/Research/Mom project 1/Data/usda_data.csv")
+usda_data = read.csv("../Data/usda_data.csv")
 head(usda_data, 10)
-neighbor_county_updated = read.csv("C:/Users/reese/OneDrive/Documents/Research/Mom project 1/Data/neighbor_county_updated.csv")
+neighbor_county_updated = read.csv("../Data/neighbor_county_updated.csv")
 head(neighbor_county_updated, 10)
 
 values_to_filter <- c(2527, 1470, 2128, 973, 2431, 3022, 867, 767, 2039, 85, 2243, 1, 298, 2827, 1642, 1299, 1884, 674, 366, 1387, 571, 220, 161, 2206, 2364, 1094, 1215, 2966, 1821, 1585, 2926, 526, 1787, 2782, 1985, 2317, 69, 3095, 1176, 2812, 1159, 1736, 1200, 1765, 285, 1754, 294, 2311)
@@ -35,13 +35,15 @@ state_subset$state <- gsub("_", " ", state_subset$state)
 
 ```{r}
 
-usda_w_pop_and_area = read.csv("C:/Users/reese/OneDrive/Documents/Research/Mom project 1/Data/usda_w_pop_and_area.csv")
+usda_w_pop_and_area = read.csv("../Data/usda_w_pop_and_area.csv")
 head(usda_w_pop_and_area, 10)
 
 neighbor_county_filtered <- neighbor_county_updated[!(neighbor_county_updated$state == neighbor_county_updated$neighboring_state & neighbor_county_updated$county == neighbor_county_updated$neighboring_county), ]
 
 usda_w_pop_and_area_simplified = dplyr::select(usda_w_pop_and_area, "region", "subregion", "Population..2020.census.", "Area..mi.2.")
 usda_w_pop_and_area_simplified = usda_w_pop_and_area_simplified[!duplicated(usda_w_pop_and_area_simplified), ]
+neighbor_county_updated <- subset(neighbor_county_updated, county != "buenavistacity")
+neighbor_county_updated <- subset(neighbor_county_updated, neighboring_county != "buenavistacity")
 
 neighboring_count =  merge(
   neighbor_county_updated,
@@ -57,6 +59,7 @@ neighboring_count_summed <- neighboring_count %>%
 neighboring_count_summed
 
 ```
+
 ```{r}
 usda_w_pop_and_area_simplified = dplyr::select(usda_w_pop_and_area, "region", 
                                         "subregion", 
@@ -150,7 +153,7 @@ linear_model_data_sheep$surrounding_animal_density <- linear_model_data_sheep$sh
 linear_model_data_sheep$surrounding_animal_density <- linear_model_data_sheep$sheep_count_summed / linear_model_data_sheep$area_summed
 
 
-write.csv(linear_model_data_sheep, "C:/Users/reese/OneDrive/Documents/Research/Mom project 1/Data/linear_model_data_sheep.csv", row.names = FALSE)
+write.csv(linear_model_data_sheep, "../Data/linear_model_data_sheep.csv", row.names = FALSE)
 
 
 head(linear_model_data_sheep)
@@ -197,7 +200,7 @@ linear_model_data_cattle$animal_density <- linear_model_data_cattle$cattle.count
 linear_model_data_cattle$surrounding_animal_density <- linear_model_data_cattle$cattle_count_summed / linear_model_data_cattle$area_summed
 
 
-write.csv(linear_model_data_cattle, "C:/Users/reese/OneDrive/Documents/Research/Mom project 1/Data/linear_model_data_cattle.csv", row.names = FALSE)
+write.csv(linear_model_data_cattle, "../Data/linear_model_data_cattle.csv", row.names = FALSE)
 
 
 head(linear_model_data_cattle, 10)
@@ -244,7 +247,7 @@ linear_model_data_broiler$animal_density <- linear_model_data_broiler$cattle.cou
 linear_model_data_broiler$surrounding_animal_density <- linear_model_data_broiler$broiler_count_summed / linear_model_data_broiler$area_summed
 
 
-write.csv(linear_model_data_broiler, "C:/Users/reese/OneDrive/Documents/Research/Mom project 1/Data/linear_model_data_broiler.csv", row.names = FALSE)
+write.csv(linear_model_data_broiler, "../Data/linear_model_data_broiler.csv", row.names = FALSE)
 
 
 
@@ -292,7 +295,7 @@ linear_model_data_layer$animal_density <- linear_model_data_layer$layer.count.x 
 linear_model_data_layer$surrounding_animal_density <- linear_model_data_layer$layer_count_summed / linear_model_data_layer$area_summed
 
 
-write.csv(linear_model_data_layer, "C:/Users/reese/OneDrive/Documents/Research/Mom project 1/Data/linear_model_data_layer.csv", row.names = FALSE)
+write.csv(linear_model_data_layer, "../Data/linear_model_data_layer.csv", row.names = FALSE)
 
 head(linear_model_data_layer, 10)
 ```
@@ -340,7 +343,7 @@ linear_model_data_hog$surrounding_animal_density <- linear_model_data_hog$hog_co
 
 head(linear_model_data_hog, 10)
 
-write.csv(linear_model_data_hog, "C:/Users/reese/OneDrive/Documents/Research/Mom project 1/Data/linear_model_data_hog.csv", row.names = FALSE)
+write.csv(linear_model_data_hog, "../Data/linear_model_data_hog.csv", row.names = FALSE)
 
 ```
 

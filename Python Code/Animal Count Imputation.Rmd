@@ -18,6 +18,9 @@ library(tidyr)
 library(stargazer)
 library(MASS)
 library(pscl)
+library(caret)
+# Ensure reproducibility
+set.seed(123)
 ```
 
 
@@ -37,9 +40,10 @@ The two linear models we looked into were the Negative Binomial Linear Regressio
 ```{r}
 usda_data = read.csv("../Data/usda_data.csv")
 
-# Specify the values to filter
+# Specify the values to filter (rows of state data)
 values_to_filter <- c(2527, 1470, 2128, 973, 2431, 3022, 867, 767, 2039, 85, 2243, 1, 298, 2827, 1642, 1299, 1884, 674, 366, 1387, 571, 220, 161, 2206, 2364, 1094, 1215, 2966, 1821, 1585, 2926, 526, 1787, 2782, 1985, 2317, 69, 3095, 1176, 2812, 1159, 1736, 1200, 1765, 285, 1754, 294, 2311)
 
+#Subset data between state counts and county counts
 state_subset <- usda_data[usda_data$X %in% values_to_filter, ]
 state_subset$state <- tolower(state_subset$state)
 state_subset$state <- gsub("_", " ", state_subset$state)
@@ -55,22 +59,25 @@ county_subset$county <- gsub("'", "", county_subset$county)
 ```
 
 ```{r}
-
+#Get a list of all the US states
 states <- map_data("state")
 states$subregion[is.na(states$subregion)] <- "none"
 
-
+#Get a list of all the US counties
 counties <- map_data("county")
 counties$subregion[is.na(counties$subregion)] <- "none"
 counties$subregion <- gsub(" ", "", counties$subregion)
 
+#Concatenate the counties list with the animal count data
 county_subset_map <- merge(counties, county_subset, sort = FALSE, by.x = c('region', 'subregion'), by.y = c('state', 'county'))
 county_subset_map <- county_subset_map[order(county_subset_map$order), ]
 
+#Create a vector of animal names for plot
 count_variables <- c("hog.count", "cattle.count", "broiler.count", "layer.count", "sheep.count")
 
 threshold <- c(10000000, 2000000, 1.25*10^8 , 7500000, 100000)
 
+#Loop through the different animal names to plot each animal count data
 for (i in 1:length(count_variables)) {
   plot_title <- gsub("\\.", " ", count_variables[i]) 
   p <- ggplot(county_subset_map, aes(long, lat)) +
@@ -80,6 +87,7 @@ for (i in 1:length(count_variables)) {
     labs(title = plot_title, fill = "Count")  +
     scale_fill_gradient(name="Count")
   
+  #Make the counties red when their animal county is -47
   red_counties <- county_subset_map[county_subset_map[[count_variables[i]]] == -47, ]
   p <- p + geom_polygon(data = red_counties, aes(group = group), fill = "red")
 
@@ -88,17 +96,33 @@ for (i in 1:length(count_variables)) {
 }
 
 ```
-## Negative Binomial Code
+## Zero Inflated Poisson Code
+
 
 ### Sheep Negative Binomial
 
 ```{r}
 #Read in csv files
 linear_model_data_sheep = read.csv("../Data/linear_model_data_sheep.csv")
+linear_model_data_sheep <- na.omit(linear_model_data_sheep)
 
+#Separate data into known and unknown animal count values
 training_linear_model_data_sheep = linear_model_data_sheep[linear_model_data_sheep$sheep.count.x != -47, ]
 training_linear_model_data_sheep = training_linear_model_data_sheep[complete.cases(training_linear_model_data_sheep["state"]), ]
-linear_model_sheep = zeroinfl(sheep.count.x ~  sheep_count_summed + surrounding_animal_density + population_density + sheep.farm.x + sheep.count.y + Population..2020.census. + Area..mi.2.,  dist = "negbin",  data = training_linear_model_data_sheep, maxit = 1000)
+
+# Define the proportion of the data to be used for training
+trainIndex <- createDataPartition(training_linear_model_data_sheep$sheep.count.x, p = 0.8, 
+                                  list = FALSE, 
+                                  times = 1)
+
+# Create the training and testing sets
+trainData <- training_linear_model_data_sheep[trainIndex,]
+testData <- training_linear_model_data_sheep[-trainIndex,]
+
+#Create the zero inflated poisson model on the training set
+linear_model_sheep = zeroinfl(sheep.count.x ~  sheep_count_summed + surrounding_animal_density + population_density + sheep.farm.x + sheep.count.y + Population..2020.census. + Area..mi.2.,  dist = "poisson",  data = trainData, maxit = 1000)
+
+#Create a table of the regression model with each coefficient
 stargazer(
   linear_model_sheep,
   type = 'text', 
@@ -107,6 +131,23 @@ stargazer(
     )
 )
 
+# Predict on training and test data
+train_predictions <- predict(linear_model_sheep, newdata = trainData, type = "response")
+test_predictions <- predict(linear_model_sheep, newdata = testData, type = "response")
+
+# Calculate Mean Absolute Error (MAE)
+mae <- function(actual, predicted) {
+  mean(abs(actual - predicted))
+}
+
+train_mae <- mae(trainData$sheep.count.x, train_predictions)
+test_mae <- mae(testData$sheep.count.x, test_predictions)
+
+# Print the MAE for both training and test sets
+cat("Training MAE:", train_mae, "\n")
+cat("Test MAE:", test_mae, "\n")
+
+#Run the model on the data for which we have no animal counts
 testing_sheep_data = linear_model_data_sheep[linear_model_data_sheep$sheep.count.x == -47, ]
 predicting_sheep_data = testing_sheep_data[ , !(names(testing_sheep_data) == "sheep.count.x")]
 
@@ -119,13 +160,18 @@ predicting_sheep_data
 
 
 ```{r}
+
+#Concatenate the predicted values back to the overall animal count dataset
 concat = rbind(training_linear_model_data_sheep, predicting_sheep_data)
 state_names = unique(concat$state)
 
+#This for loop scales the predictions of the regression model to the state totals. Helps address any error present in the model
 for (i in state_names){
+  #Separate the dataframe into the training and prediction set
   temp_training_df = training_linear_model_data_sheep[training_linear_model_data_sheep$state == i, ]
   temp_prediction_df = predicting_sheep_data[predicting_sheep_data$state == i, ]
   state_count = temp_training_df$sheep.count.y[1]
+  #If the state count is not -47, scale the data of the counties to equal the count of the state
   if (state_count != -47){
     diff = state_count - sum(temp_training_df$sheep.count.x)
     counties_count = sum(temp_prediction_df$sheep.count.x)
@@ -136,6 +182,7 @@ for (i in state_names){
   }
 }
 
+#Add the scaled data back to the total data set
 concat = rbind(training_linear_model_data_sheep, predicting_sheep_data)
 
 ```
@@ -143,14 +190,16 @@ concat = rbind(training_linear_model_data_sheep, predicting_sheep_data)
 
 
 ```{r}
-
+#Get a list of all the US counties
 counties <- map_data("county")
 counties$subregion[is.na(counties$subregion)] <- "none"
 counties$subregion <- gsub(" ", "", counties$subregion)
 
+#Concatenate the counties list with the animal count data
 county_subset_map <- merge(counties, concat, sort = FALSE, by.x = c('region', 'subregion'), by.y = c('state', 'county.x'), all = TRUE)
 county_subset_map <- county_subset_map[order(county_subset_map$order), ]
 
+#Plot the map of the animal count data over the US
 plot_title <- gsub("\\.", " ", count_variables["sheep.count.x"]) 
 p <- ggplot(county_subset_map, aes(long, lat)) +
   geom_polygon(aes(group = group, fill = get("sheep.count.x"))) +
@@ -166,10 +215,22 @@ print(p)
 ```{r}
 #Read in csv files
 linear_model_data_hog = read.csv("../Data/linear_model_data_hog.csv")
+linear_model_data_hog <- na.omit(linear_model_data_hog)
+
 
 training_linear_model_data_hog = linear_model_data_hog[linear_model_data_hog$hog.count.x != -47, ]
 training_linear_model_data_hog = training_linear_model_data_hog[complete.cases(training_linear_model_data_hog["state"]), ]
-linear_model_hog = zeroinfl(hog.count.x ~ hog_count_summed + surrounding_animal_density + population_density + hog.farm.x + hog.count.y + Population..2020.census. + Area..mi.2., dist = "negbin", data = training_linear_model_data_hog, maxit = 1000)
+
+# Define the proportion of the data to be used for training
+trainIndex <- createDataPartition(training_linear_model_data_hog$hog.count.x, p = 0.8, 
+                                  list = FALSE, 
+                                  times = 1)
+
+# Create the training and testing sets
+trainData <- training_linear_model_data_hog[trainIndex,]
+testData <- training_linear_model_data_hog[-trainIndex,]
+
+linear_model_hog = zeroinfl(hog.count.x ~ hog_count_summed + surrounding_animal_density + population_density + hog.farm.x + hog.count.y + Population..2020.census. + Area..mi.2., dist = "poisson", data = trainData, maxit = 1000)
 
 stargazer(
   linear_model_hog,
@@ -178,6 +239,22 @@ stargazer(
     'Surrounding Hog Count', 'Surrounding Hog Density', 'Surrounding Population Density', "Hog Farms", "Total State Hog Count", "County Population", "County Area"
     )
 )
+
+# Predict on training and test data
+train_predictions <- predict(linear_model_hog, newdata = trainData, type = "response")
+test_predictions <- predict(linear_model_hog, newdata = testData, type = "response")
+
+# Calculate Mean Absolute Error (MAE)
+mae <- function(actual, predicted) {
+  mean(abs(actual - predicted))
+}
+
+train_mae <- mae(trainData$hog.count.x, train_predictions)
+test_mae <- mae(testData$hog.count.x, test_predictions)
+
+# Print the MAE for both training and test sets
+cat("Training MAE:", train_mae, "\n")
+cat("Test MAE:", test_mae, "\n")
 
 testing_hog_data = linear_model_data_hog[linear_model_data_hog$hog.count.x == -47, ]
 predicting_hog_data = testing_hog_data[ , !(names(testing_hog_data) == "hog.count.x")]
@@ -233,10 +310,22 @@ print(p)
 ```{r}
 #Read in csv files
 linear_model_data_broiler = read.csv("../Data/linear_model_data_broiler.csv")
+linear_model_data_broiler <- na.omit(linear_model_data_broiler)
+
 
 training_linear_model_data_broiler = linear_model_data_broiler[linear_model_data_broiler$broiler.count.x != -47, ]
 training_linear_model_data_broiler = training_linear_model_data_broiler[complete.cases(training_linear_model_data_broiler["state"]), ]
-linear_model_broiler = zeroinfl(broiler.count.x ~ broiler_count_summed + surrounding_population_density + population_density + broiler.farm.x + broiler.count.y + Population..2020.census. + Area..mi.2.,  data = training_linear_model_data_broiler,  dist = "negbin", maxit = 1000)
+
+# Define the proportion of the data to be used for training
+trainIndex <- createDataPartition(training_linear_model_data_broiler$broiler.count.x, p = 0.8, 
+                                  list = FALSE, 
+                                  times = 1)
+
+# Create the training and testing sets
+trainData <- training_linear_model_data_broiler[trainIndex,]
+testData <- training_linear_model_data_broiler[-trainIndex,]
+
+linear_model_broiler = zeroinfl(broiler.count.x ~ broiler_count_summed + surrounding_population_density + population_density + broiler.farm.x + broiler.count.y + Population..2020.census. + Area..mi.2.,  data = trainData,  dist = "poisson", maxit = 1000)
 
 stargazer(
   linear_model_broiler,
@@ -245,6 +334,22 @@ stargazer(
     'Surrounding Broiler Count', 'Surrounding Broiler Density', 'Surrounding Population Density', "Broiler Farms", "Total State Broiler Count", "County Population", "County Area"
     )
 )
+
+# Predict on training and test data
+train_predictions <- predict(linear_model_broiler, newdata = trainData, type = "response")
+test_predictions <- predict(linear_model_broiler, newdata = testData, type = "response")
+
+# Calculate Mean Absolute Error (MAE)
+mae <- function(actual, predicted) {
+  mean(abs(actual - predicted))
+}
+
+train_mae <- mae(trainData$broiler.count.x, train_predictions)
+test_mae <- mae(testData$broiler.count.x, test_predictions)
+
+# Print the MAE for both training and test sets
+cat("Training MAE:", train_mae, "\n")
+cat("Test MAE:", test_mae, "\n")
 
 testing_broiler_data = linear_model_data_broiler[linear_model_data_broiler$broiler.count.x == -47, ]
 predicting_broiler_data = testing_broiler_data[ , !(names(testing_broiler_data) == "broiler.count.x")]
@@ -300,10 +405,22 @@ print(p)
 ```{r}
 #Read in csv files
 linear_model_data_layer = read.csv("../Data/linear_model_data_layer.csv")
+linear_model_data_layer <- na.omit(linear_model_data_layer)
+
 
 training_linear_model_data_layer = linear_model_data_layer[linear_model_data_layer$layer.count.x != -47, ]
 training_linear_model_data_layer = training_linear_model_data_layer[complete.cases(training_linear_model_data_layer["state"]), ]
-linear_model_layer = zeroinfl(layer.count.x ~ layer_count_summed + surrounding_population_density + population_density + layer.farm.x + layer.count.y + Population..2020.census. + Area..mi.2., dist = "negbin", data = training_linear_model_data_layer, maxit = 1000)
+
+# Define the proportion of the data to be used for training
+trainIndex <- createDataPartition(training_linear_model_data_layer$layer.count.x, p = 0.8, 
+                                  list = FALSE, 
+                                  times = 1)
+
+# Create the training and testing sets
+trainData <- training_linear_model_data_layer[trainIndex,]
+testData <- training_linear_model_data_layer[-trainIndex,]
+
+linear_model_layer = zeroinfl(layer.count.x ~ layer_count_summed + surrounding_population_density + population_density + layer.farm.x + layer.count.y + Population..2020.census. + Area..mi.2., dist = "poisson", data = training_linear_model_data_layer, maxit = 1000)
 stargazer(
   linear_model_layer,
   type = 'text', 
@@ -312,6 +429,21 @@ stargazer(
     )
 )
 
+# Predict on training and test data
+train_predictions <- predict(linear_model_layer, newdata = trainData, type = "response")
+test_predictions <- predict(linear_model_layer, newdata = testData, type = "response")
+
+# Calculate Mean Absolute Error (MAE)
+mae <- function(actual, predicted) {
+  mean(abs(actual - predicted))
+}
+
+train_mae <- mae(trainData$layer.count.x, train_predictions)
+test_mae <- mae(testData$layer.count.x, test_predictions)
+
+# Print the MAE for both training and test sets
+cat("Training MAE:", train_mae, "\n")
+cat("Test MAE:", test_mae, "\n")
 
 testing_layer_data = linear_model_data_layer[linear_model_data_layer$layer.count.x == -47, ]
 predicting_layer_data = testing_layer_data[ , !(names(testing_layer_data) == "layer.count.x")]
@@ -365,10 +497,22 @@ print(p)
 ```{r}
 #Read in csv files
 linear_model_data_cattle = read.csv("../Data/linear_model_data_cattle.csv")
+linear_model_data_cattle <- na.omit(linear_model_data_cattle)
+
 
 training_linear_model_data_cattle = linear_model_data_cattle[linear_model_data_cattle$cattle.count.x != -47, ]
 training_linear_model_data_cattle = training_linear_model_data_cattle[complete.cases(training_linear_model_data_cattle["state"]), ]
-linear_model_cattle = zeroinfl(cattle.count.x ~ cattle_count_summed + surrounding_population_density + population_density + cattle.farms.x + cattle.count.y + Population..2020.census. + Area..mi.2., dist = "negbin",  data = training_linear_model_data_cattle, maxit = 1000)
+
+# Define the proportion of the data to be used for training
+trainIndex <- createDataPartition(training_linear_model_data_cattle$cattle.count.x, p = 0.8, 
+                                  list = FALSE, 
+                                  times = 1)
+
+# Create the training and testing sets
+trainData <- training_linear_model_data_cattle[trainIndex,]
+testData <- training_linear_model_data_cattle[-trainIndex,]
+
+linear_model_cattle = zeroinfl(cattle.count.x ~ cattle_count_summed + surrounding_population_density + population_density + cattle.farms.x + cattle.count.y + Population..2020.census. + Area..mi.2., dist = "poisson",  data = training_linear_model_data_cattle, maxit = 1000)
 stargazer(
   linear_model_cattle,
   type = 'text', 
@@ -376,6 +520,22 @@ stargazer(
     'Surrounding Cattle Count', 'Surrounding Cattle Density', 'Surrounding Population Density', "Cattle Farms", "Total State Cattle Count", "County Population", "County Area"
     )
 )
+
+# Predict on training and test data
+train_predictions <- predict(linear_model_cattle, newdata = trainData, type = "response")
+test_predictions <- predict(linear_model_cattle, newdata = testData, type = "response")
+
+# Calculate Mean Absolute Error (MAE)
+mae <- function(actual, predicted) {
+  mean(abs(actual - predicted))
+}
+
+train_mae <- mae(trainData$cattle.count.x, train_predictions)
+test_mae <- mae(testData$cattle.count.x, test_predictions)
+
+# Print the MAE for both training and test sets
+cat("Training MAE:", train_mae, "\n")
+cat("Test MAE:", test_mae, "\n")
 
 testing_cattle_data = linear_model_data_cattle[linear_model_data_cattle$cattle.count.x == -47, ]
 predicting_cattle_data = testing_cattle_data[ , !(names(testing_cattle_data) == "cattle.count.x")]
