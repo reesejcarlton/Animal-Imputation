@@ -1,0 +1,677 @@
+---
+title: "CAFO's Imputing Maps"
+output: pdf_document
+date: "2024-05-13"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(include = FALSE, message = FALSE, warning = FALSE )
+`
+install.packages("ggplot2")
+install.packages("dplyr")
+install.packages("data.table")
+install.packages("sets")
+install.packages("stringr")
+install.packages("tidyr")
+install.packages("stargazer")
+install.packages("MASS")
+install.packages("pscl")
+install.packages("caret")
+``
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(data.table)
+library(sets)
+library(stringr)
+library(tidyr)
+library(stargazer)
+library(MASS)
+library(pscl)
+library(caret)
+# Ensure reproducibility
+set.seed(123)
+```
+
+
+## Procedure
+
+In order to build the model to impute the missing values we began with reading in the 2022 USDA: Census of Agriculture ("https://www.nass.usda.gov/Publications/AgCensus/2022/Full_Report/Volume_1,_Chapter_2_County_Level/"). Using python's request library, I looped through the agricultural census data for each state, scraping the relevant animal and farm counts for each county and state total.
+
+From there, we conducted preliminary EDA, using R's ggplot2 library to visualize animal and farm counts for each animal with both state and county maps. Noticing that some counties and states had values of D, seemingly representing missing animal counties for certain counties and states, we also created maps visualizing the missing data along side the animal count data. 
+
+Seeing the large number of counties and some states that had D value for certain animals, we decided to explore imputing the missing values using a number of features, such as surrounding counties' area, surrounding counties' animal count, surrounding counties' population,  state animal count, county area, county farm count, population of county to build out a linear model that would both impute these values and give a sense for each of these different covariates and how they impact the animal counts within the county.
+
+To find the data on surrounding counties, the County Adjacency File ("https://www.census.gov/geographies/reference-files/time-series/geo/county-adjacency.html") was used which included a list of every counties and those that bordered it. From here, we summed the population, area and animal counts for every county's surrounding counties and added it to our initial Census of Agricultural dataset.
+
+The two linear models we looked into were the Negative Binomial Linear Regression model and the Poisson Linear Regression Model. Both of these models excel for count data as they are limited to not be zero. The Poisson Linear Regression model makes the assumption that the data's mean roughly equal the data's variance, with the ability to handle the large number of counties that have zero animals. On the other handle, Negative Binomial Linear Regression doesn't require the assumption of the data's mean equaling its variance, as it has an over dispersion term to control the extent of the variation.
+
+## Map Plots
+```{r}
+usda_data = read.csv("../Data/usda_data.csv")
+
+# Specify the values to filter (rows of state data)
+values_to_filter <- c(2527, 1470, 2128, 973, 2431, 3022, 867, 767, 2039, 85, 2243, 1, 298, 2827, 1642, 1299, 1884, 674, 366, 1387, 571, 220, 161, 2206, 2364, 1094, 1215, 2966, 1821, 1585, 2926, 526, 1787, 2782, 1985, 2317, 69, 3095, 1176, 2812, 1159, 1736, 1200, 1765, 285, 1754, 294, 2311)
+
+#Subset data between state counts and county counts
+state_subset <- usda_data[usda_data$X %in% values_to_filter, ]
+state_subset$state <- tolower(state_subset$state)
+state_subset$state <- gsub("_", " ", state_subset$state)
+
+county_subset <- usda_data[!(usda_data$X %in% values_to_filter), ]
+county_subset$state <- tolower(county_subset$state)
+county_subset$county <- tolower(county_subset$county)
+county_subset$state <- gsub("_", " ", county_subset$state)
+county_subset$county <- gsub("_", "", county_subset$county)
+county_subset$county <- gsub("\\.", "", county_subset$county)
+county_subset$county <- gsub(" ", "", county_subset$county)
+county_subset$county <- gsub("'", "", county_subset$county)
+```
+
+
+```{r}
+missing <- 0
+for (i in 1:nrow(state_subset)) {
+  state <- state_subset$state[i]
+  county_subset2 <- county_subset[county_subset$state==state,]
+  missing <- missing + (state_subset$hog.count[i] - sum(county_subset2$hog.count, na.rm=TRUE)) 
+}
+
+```
+```{r}
+#Get a list of all the US states
+states <- map_data("state")
+states$subregion[is.na(states$subregion)] <- "none"
+
+#Get a list of all the US counties
+counties <- map_data("county")
+counties$subregion[is.na(counties$subregion)] <- "none"
+counties$subregion <- gsub(" ", "", counties$subregion)
+
+#Concatenate the counties list with the animal count data
+county_subset_map <- merge(counties, county_subset, sort = FALSE, by.x = c('region', 'subregion'), by.y = c('state', 'county'))
+county_subset_map <- county_subset_map[order(county_subset_map$order), ]
+
+#Create a vector of animal names for plot
+count_variables <- c("hog.count", "cattle.count", "broiler.count", "layer.count", "sheep.count")
+
+threshold <- c(15000, 2000000, 1.25*10^8 , 7500000, 100000)
+
+
+#Loop through the different animal names to plot each animal count data
+for (i in 1:length(count_variables)) {
+  county_subset_map2 <- county_subset_map
+  county_subset_map2[count_variables[i]] <- apply(data.frame(rep(threshold[i],nrow(county_subset_map)), county_subset_map2[count_variables[i]]),1,min) 
+  plot_title <- gsub("\\.", " ", count_variables[i]) 
+  p <- ggplot(county_subset_map2, aes(long, lat)) +
+    geom_polygon(aes(group = group, fill = get(count_variables[i]))) +
+    geom_path(data = states, aes(long, lat, group = group), color = "black") +
+    coord_map("albers",  lat0 = 45.5, lat1 = 29.5) +
+    labs(title = plot_title, fill = "Count")  +
+    scale_fill_gradient(name="Count",low="white", high="red") 
+  
+  #Make the counties red when their animal county is -47
+  red_counties <- county_subset_map[county_subset_map[[count_variables[i]]] == -47, ]
+  p <- p + geom_polygon(data = red_counties, aes(group = group), fill = "white")
+
+  
+  print(p)
+}
+
+```
+## Zero Inflated Poisson Code
+
+
+### Sheep Negative Binomial
+
+```{r}
+
+set.seed(123)
+#Read in csv files
+linear_model_data_sheep = read.csv("../Data/Animal Linear Model Data/linear_model_data_sheep.csv")
+linear_model_data_sheep <- na.omit(linear_model_data_sheep)
+
+#Separate data into known and unknown animal count values
+training_linear_model_data_sheep = linear_model_data_sheep[linear_model_data_sheep$sheepCount != -47, ]
+training_linear_model_data_sheep = training_linear_model_data_sheep[complete.cases(training_linear_model_data_sheep["State"]), ]
+
+# Define the proportion of the data to be used for training
+trainIndex <- createDataPartition(training_linear_model_data_sheep$sheepCount, p = 0.8, 
+                                  list = FALSE, 
+                                  times = 1)
+
+# Create the training and testing sets
+trainData <- training_linear_model_data_sheep[trainIndex,]
+testData <- training_linear_model_data_sheep[-trainIndex,]
+
+#Create the zero inflated poisson model on the training set
+linear_model_sheep = zeroinfl(sheepCount ~ surroundingFarmDensity + surroundAnimalDensity + farmDensity + stateSheepFarms + stateSheepCount + surroundingPopulationDensity + populationDensity + personalIncome2022 + tavg_JAN + tavg_FEB + tavg_MAR + tavg_APR + tavg_MAY + tavg_JUN + tavg_JUL + tavg_AUG + tavg_SEP + tavg_OCT + tavg_NOV + tavg_DEC + Area..mi.2.,  dist = "poisson",  data = trainData, maxit = 1000)
+
+#Create a table of the regression model with each coefficient
+stargazer(
+  linear_model_sheep,
+  type = 'html',  # Save as HTML (or use 'latex' if preferred)
+  covariate.labels = c(
+    'Surrounding Farm Density', 'Surrounding Sheep Density', 'Farm Density', 'State Sheep Farms', 
+    'State Sheep Count', 'Surrounding Population Density', 'Population Density', 'County Income per Capita', 
+    'Average Temperature - January', 'Average Temperature - February', 'Average Temperature - March', 
+    'Average Temperature - April', 'Average Temperature - May', 'Average Temperature - June', 
+    'Average Temperature - July', 'Average Temperature - August', 'Average Temperature - September', 
+    'Average Temperature - October', 'Average Temperature - November', 'Average Temperature - December', 
+    'County Area'
+  ),
+  out = "sheep_output.html"  # Save output as an HTML file
+)
+
+# Predict on training and test data
+train_predictions <- predict(linear_model_sheep, newdata = trainData, type = "response")
+test_predictions <- predict(linear_model_sheep, newdata = testData, type = "response")
+
+# Calculate Mean Relative Absolute Error (MRAE), ignoring cases where actual value is zero
+mrae <- function(actual, predicted) {
+  # Filter out zero actual values to prevent division by zero
+  non_zero_indices <- actual != 0
+  mean(abs((actual[non_zero_indices] - predicted[non_zero_indices]) / actual[non_zero_indices]))
+}
+
+# Recalculate MRAE
+train_mrae <- mrae(trainData$sheepCount, train_predictions)
+test_mrae <- mrae(testData$sheepCount, test_predictions)
+
+# Print the MRAE for both training and test sets
+cat("Training MRAE:", train_mrae, "\n")
+cat("Test MRAE:", test_mrae, "\n")
+
+#Run the model on the data for which we have no animal counts
+testing_sheep_data = linear_model_data_sheep[linear_model_data_sheep$sheepCount == -47, ]
+predicting_sheep_data = testing_sheep_data[ , !(names(testing_sheep_data) == "sheepCount")]
+
+predicting_sheep_data$sheepCount = predict(linear_model_sheep, newdata = predicting_sheep_data, type = "response")
+predicting_sheep_data = predicting_sheep_data[complete.cases(predicting_sheep_data["State"]), ]
+predicting_sheep_data
+
+```
+```{r}
+#Create a plot of the actual vs prediction. I am only a computer model
+plot(trainData$sheepCount,trainData$test_predictions, xlim=c(0,2000),ylim=c(0,2000))
+```
+
+
+```{r}
+
+#Concatenate the predicted values back to the overall animal count dataset
+concat = rbind(training_linear_model_data_sheep, predicting_sheep_data)
+state_names = unique(concat$state)
+
+#This for loop scales the predictions of the regression model to the state totals. Helps address any error present in the model
+for (i in state_names){
+  #Separate the dataframe into the training and prediction set
+  temp_training_df = training_linear_model_data_sheep[training_linear_model_data_sheep$State == i, ]
+  temp_prediction_df = predicting_sheep_data[predicting_sheep_data$State == i, ]
+  state_count = temp_training_df$stateSheepCount[1]
+  #If the state count is not -47, scale the data of the counties to equal the count of the state
+  if (state_count != -47){
+    diff = state_count - sum(temp_training_df$sheepCount)
+    counties_count = sum(temp_prediction_df$sheepCount)
+    scaling_factor = diff / counties_count
+    
+    predicting_sheep_data$sheepCount[predicting_sheep_data$State == i] = 
+      round(predicting_sheep_data$sheepCount[predicting_sheep_data$State == i] * scaling_factor)
+  }
+}
+
+#Add the scaled data back to the total data set
+concat = rbind(training_linear_model_data_sheep, predicting_sheep_data)
+
+```
+
+
+
+```{r}
+#Get a list of all the US counties
+counties <- map_data("county")
+counties$subregion[is.na(counties$subregion)] <- "none"
+counties$subregion <- gsub(" ", "", counties$subregion)
+
+#Concatenate the counties list with the animal count data
+county_subset_map <- merge(counties, concat, sort = FALSE, by.x = c('region', 'subregion'), by.y = c('State', 'County'), all = TRUE)
+na_rows <- county_subset_map[!complete.cases(county_subset_map), ]
+
+county_subset_map <- county_subset_map[order(county_subset_map$order), ]
+
+#Plot the map of the animal count data over the US
+plot_title <- gsub("\\.", " ", count_variables["sheepCount"]) 
+p <- ggplot(county_subset_map, aes(long, lat)) +
+  geom_polygon(aes(group = group, fill = get("sheepCount"))) +
+  geom_path(data = states, aes(long, lat, group = group), color = "black") +
+  coord_map("albers",  lat0 = 45.5, lat1 = 29.5) +
+  labs(title = "Sheep Count Filled", fill = "Count")   +
+    scale_fill_gradient(name="sheepCount",low="white", high="red")
+
+print(p)
+```
+
+### Hog Negative Binomial
+
+```{r}
+set.seed(123)
+
+#Read in csv files
+linear_model_data_hog = read.csv("../Data/Animal Linear Model Data/linear_model_data_hog.csv")
+linear_model_data_hog <- na.omit(linear_model_data_hog)
+
+
+training_linear_model_data_hog = linear_model_data_hog[linear_model_data_hog$hogCount != -47, ]
+training_linear_model_data_hog = training_linear_model_data_hog[complete.cases(training_linear_model_data_hog["State"]), ]
+
+# Define the proportion of the data to be used for training
+trainIndex <- createDataPartition(training_linear_model_data_hog$hogCount, p = 0.8, 
+                                  list = FALSE, 
+                                  times = 1)
+
+# Create the training and testing sets
+trainData <- training_linear_model_data_hog[trainIndex,]
+testData <- training_linear_model_data_hog[-trainIndex,]
+
+linear_model_hog = zeroinfl(hogCount ~ surroundingFarmDensity + surroundAnimalDensity + farmDensity + stateHogFarms + stateHogCount + surroundingPopulationDensity + populationDensity + personalIncome2022 + tavg_JAN + tavg_FEB + tavg_MAR + tavg_APR + tavg_MAY + tavg_JUN + tavg_JUL + tavg_AUG + tavg_SEP + tavg_OCT + tavg_NOV + tavg_DEC + Area..mi.2., data = trainData, maxit = 1000)
+
+stargazer(
+  linear_model_hog,
+  type = 'html',  # Save as HTML (or use 'latex' if preferred)
+  covariate.labels = c(
+    'Surrounding Farm Density', 'Surrounding Hog Density', 'Farm Density', 'State Hog Farms', 
+    'State Hog Count', 'Surrounding Population Density', 'Population Density', 'County Income per Capita', 
+    'Average Temperature - January', 'Average Temperature - February', 'Average Temperature - March', 
+    'Average Temperature - April', 'Average Temperature - May', 'Average Temperature - June', 
+    'Average Temperature - July', 'Average Temperature - August', 'Average Temperature - September', 
+    'Average Temperature - October', 'Average Temperature - November', 'Average Temperature - December', 
+    'County Area'
+  ),
+  out = "hog_output.html"  # Save output as an HTML file
+)
+
+# Predict on training and test data
+train_predictions <- predict(linear_model_hog, newdata = trainData, type = "response")
+test_predictions <- predict(linear_model_hog, newdata = testData, type = "response")
+
+# Calculate Mean Absolute Error (MAE)
+mae <- function(actual, predicted) {
+  mean(abs(actual - predicted))
+}
+
+train_mae <- mae(trainData$hogCount, train_predictions)
+test_mae <- mae(testData$hogCount, test_predictions)
+
+# Print the MAE for both training and test sets
+cat("Training MAE:", train_mae, "\n")
+cat("Test MAE:", test_mae, "\n")
+
+testing_hog_data = linear_model_data_hog[linear_model_data_hog$hogCount == -47, ]
+predicting_hog_data = testing_hog_data[ , !(names(testing_hog_data) == "hogCount")]
+
+predicting_hog_data$hogCount = predict(linear_model_hog, newdata = predicting_hog_data, type = "response")
+predicting_hog_data = predicting_hog_data[complete.cases(predicting_hog_data["State"]), ]
+predicting_hog_data
+
+```
+
+```{r}
+concat = rbind(training_linear_model_data_hog, predicting_hog_data)
+state_names = unique(concat$state)
+
+for (i in state_names){
+  temp_training_df = training_linear_model_data_hog[training_linear_model_data_hog$state == i, ]
+  temp_prediction_df = predicting_hog_data[predicting_hog_data$state == i, ]
+  state_count = temp_training_df$hog.count.y[1]
+  if (state_count != -47){
+    diff = state_count - sum(temp_training_df$hog.count.x)
+    counties_count = sum(temp_prediction_df$hog.count.x)
+    scaling_factor = diff / counties_count
+    
+    predicting_hog_data$hog.count.x[predicting_hog_data$state == i] = 
+      round(predicting_hog_data$hog.count.x[predicting_hog_data$state == i] * scaling_factor)
+  }
+}
+
+concat = rbind(training_linear_model_data_hog, predicting_hog_data)
+
+```
+
+```{r}
+threshold <- c(15000, 2000000, 1.25*10^8 , 7500000, 100000)
+
+counties <- map_data("county")
+counties$subregion[is.na(counties$subregion)] <- "none"
+counties$subregion <- gsub(" ", "", counties$subregion)
+
+
+county_subset_map <- merge(counties, concat, sort = FALSE, by.x = c('region', 'subregion'), by.y = c('State', 'County'), all = TRUE)
+county_subset_map <- county_subset_map[order(county_subset_map$order), ]
+
+county_subset_map2 <- county_subset_map
+county_subset_map2["hogCount"] <- apply(data.frame(rep(threshold[1],nrow(county_subset_map)), county_subset_map2["hogCount"]),1,min) 
+plot_title <- gsub("\\.", " ", count_variables["hogCount"]) 
+p <- ggplot(county_subset_map2, aes(long, lat)) +
+  geom_polygon(aes(group = group, fill = get("hogCount"))) +
+  geom_path(data = states, aes(long, lat, group = group), color = "black") +
+  coord_map("albers",  lat0 = 45.5, lat1 = 29.5) +
+  labs(title = "hog Count Filled", fill = "Count")  +
+    scale_fill_gradient(name="hogCount",low="white", high="red") 
+
+print(p)
+```
+
+### Broiler Negative Binomial
+
+```{r}
+set.seed(123)
+
+#Read in csv files
+linear_model_data_broiler = read.csv("../Data/Animal Linear Model Data/linear_model_data_broiler.csv")
+linear_model_data_broiler <- na.omit(linear_model_data_broiler)
+
+
+training_linear_model_data_broiler = linear_model_data_broiler[linear_model_data_broiler$broilerCount != -47, ]
+training_linear_model_data_broiler = training_linear_model_data_broiler[complete.cases(training_linear_model_data_broiler["State"]), ]
+
+# Define the proportion of the data to be used for training
+trainIndex <- createDataPartition(training_linear_model_data_broiler$broilerCount, p = 0.8, 
+                                  list = FALSE, 
+                                  times = 1)
+
+# Create the training and testing sets
+trainData <- training_linear_model_data_broiler[trainIndex,]
+testData <- training_linear_model_data_broiler[-trainIndex,]
+
+linear_model_broiler = zeroinfl(broilerCount ~ surroundingFarmDensity + surroundAnimalDensity + farmDensity + stateBroilerFarms + stateBroilerCount + surroundingPopulationDensity + populationDensity + personalIncome2022 + tavg_JAN + tavg_FEB + tavg_MAR + tavg_APR + tavg_MAY + tavg_JUN + tavg_JUL + tavg_AUG + tavg_SEP + tavg_OCT + tavg_NOV + tavg_DEC + Area..mi.2.,  data = trainData,  dist = "poisson", maxit = 1000)
+
+stargazer(
+  linear_model_broiler,
+  type = 'html',  # Save as HTML (or use 'latex' if preferred)
+  covariate.labels = c(
+    'Surrounding Farm Density', 'Surrounding Broiler Density', 'Farm Density', 'State Broiler Farms', 
+    'State Broiler Count', 'Surrounding Population Density', 'Population Density', 'County Income per Capita', 
+    'Average Temperature - January', 'Average Temperature - February', 'Average Temperature - March', 
+    'Average Temperature - April', 'Average Temperature - May', 'Average Temperature - June', 
+    'Average Temperature - July', 'Average Temperature - August', 'Average Temperature - September', 
+    'Average Temperature - October', 'Average Temperature - November', 'Average Temperature - December', 
+    'County Area'
+  ),
+  out = "broiler_output.html"  # Save output as an HTML file
+)
+
+# Predict on training and test data
+train_predictions <- predict(linear_model_broiler, newdata = trainData, type = "response")
+test_predictions <- predict(linear_model_broiler, newdata = testData, type = "response")
+
+# Calculate Mean Absolute Error (MAE)
+mae <- function(actual, predicted) {
+  mean(abs(actual - predicted))
+}
+
+train_mae <- mae(trainData$broilerCount, train_predictions)
+test_mae <- mae(testData$broilerCount, test_predictions)
+
+# Print the MAE for both training and test sets
+cat("Training MAE:", train_mae, "\n")
+cat("Test MAE:", test_mae, "\n")
+
+testing_broiler_data = linear_model_data_broiler[linear_model_data_broiler$broilerCount == -47, ]
+predicting_broiler_data = testing_broiler_data[ , !(names(testing_broiler_data) == "broilerCount")]
+
+predicting_broiler_data$broilerCount = predict(linear_model_broiler, newdata = predicting_broiler_data, type = "response")
+predicting_broiler_data = predicting_broiler_data[complete.cases(predicting_broiler_data["State"]), ]
+predicting_broiler_data
+
+```
+
+```{r}
+concat = rbind(training_linear_model_data_broiler, predicting_broiler_data)
+state_names = unique(concat$state)
+
+for (i in state_names){
+  temp_training_df = training_linear_model_data_broiler[training_linear_model_data_broiler$State == i, ]
+  temp_prediction_df = predicting_broiler_data[predicting_broiler_data$State == i, ]
+  state_count = temp_training_df$stateBroilerCount[1]
+  if (state_count != -47){
+    diff = state_count - sum(temp_training_df$broilerCount)
+    counties_count = sum(temp_prediction_df$broilerCount)
+    scaling_factor = diff / counties_count
+    
+    predicting_broiler_data$broilerCount[predicting_broiler_data$State == i] = 
+      round(predicting_broiler_data$broilerCount[predicting_broiler_data$State == i] * scaling_factor)
+  }
+}
+
+concat = rbind(training_linear_model_data_broiler, predicting_broiler_data)
+
+```
+
+```{r}
+counties <- map_data("county")
+counties$subregion[is.na(counties$subregion)] <- "none"
+counties$subregion <- gsub(" ", "", counties$subregion)
+
+county_subset_map <- merge(counties, concat, sort = FALSE, by.x = c('region', 'subregion'), by.y = c('State', 'County'), all = TRUE)
+county_subset_map <- county_subset_map[order(county_subset_map$order), ]
+
+plot_title <- gsub("\\.", " ", count_variables["broilerCount"]) 
+p <- ggplot(county_subset_map, aes(long, lat)) +
+  geom_polygon(aes(group = group, fill = get("broilerCount"))) +
+  geom_path(data = states, aes(long, lat, group = group), color = "black") +
+  coord_map("albers",  lat0 = 45.5, lat1 = 29.5) +
+  labs(title = "broiler Count Filled", fill = "Count")  
+
+print(p)
+```
+
+### Layer Negative Binomial
+
+```{r}
+set.seed(123)
+
+#Read in csv files
+linear_model_data_layer = read.csv("../Data/Animal Linear Model Data/linear_model_data_layer.csv")
+linear_model_data_layer <- na.omit(linear_model_data_layer)
+
+
+training_linear_model_data_layer = linear_model_data_layer[linear_model_data_layer$layerCount != -47, ]
+training_linear_model_data_layer = training_linear_model_data_layer[complete.cases(training_linear_model_data_layer["State"]), ]
+
+# Define the proportion of the data to be used for training
+trainIndex <- createDataPartition(training_linear_model_data_layer$layerCount, p = 0.8, 
+                                  list = FALSE, 
+                                  times = 1)
+
+# Create the training and testing sets
+trainData <- training_linear_model_data_layer[trainIndex,]
+testData <- training_linear_model_data_layer[-trainIndex,]
+
+linear_model_layer = zeroinfl(layerCount ~ surroundingFarmDensity + surroundAnimalDensity + farmDensity + stateLayerFarms + stateLayerCount + surroundingPopulationDensity + populationDensity + personalIncome2022 + tavg_JAN + tavg_FEB + tavg_MAR + tavg_APR + tavg_MAY + tavg_JUN + tavg_JUL + tavg_AUG + tavg_SEP + tavg_OCT + tavg_NOV + tavg_DEC + Area..mi.2., dist = "poisson", data = training_linear_model_data_layer, maxit = 1000)
+
+stargazer(
+  linear_model_layer,
+  type = 'html',  # Save as HTML (or use 'latex' if preferred)
+  covariate.labels = c(
+    'Surrounding Farm Density', 'Surrounding Layer Density', 'Farm Density', 'State Layer Farms', 
+    'State Layer Count', 'Surrounding Population Density', 'Population Density', 'County Income per Capita', 
+    'Average Temperature - January', 'Average Temperature - February', 'Average Temperature - March', 
+    'Average Temperature - April', 'Average Temperature - May', 'Average Temperature - June', 
+    'Average Temperature - July', 'Average Temperature - August', 'Average Temperature - September', 
+    'Average Temperature - October', 'Average Temperature - November', 'Average Temperature - December', 
+    'County Area'
+  ),
+  out = "layer_output.html"  # Save output as an HTML file
+)
+
+# Predict on training and test data
+train_predictions <- predict(linear_model_layer, newdata = trainData, type = "response")
+test_predictions <- predict(linear_model_layer, newdata = testData, type = "response")
+
+# Calculate Mean Absolute Error (MAE)
+mae <- function(actual, predicted) {
+  mean(abs(actual - predicted))
+}
+
+train_mae <- mae(trainData$layerCount, train_predictions)
+test_mae <- mae(testData$layerCount, test_predictions)
+
+# Print the MAE for both training and test sets
+cat("Training MAE:", train_mae, "\n")
+cat("Test MAE:", test_mae, "\n")
+
+testing_layer_data = linear_model_data_layer[linear_model_data_layer$layerCount == -47, ]
+predicting_layer_data = testing_layer_data[ , !(names(testing_layer_data) == "layerCount")]
+
+predicting_layer_data$layerCount = predict(linear_model_layer, newdata = predicting_layer_data, type = "response")
+predicting_layer_data = predicting_layer_data[complete.cases(predicting_layer_data["State"]), ]
+predicting_layer_data
+
+```
+
+```{r}
+concat = rbind(training_linear_model_data_layer, predicting_layer_data)
+state_names = unique(concat$state)
+
+for (i in state_names){
+  temp_training_df = training_linear_model_data_layer[training_linear_model_data_layer$State == i, ]
+  temp_prediction_df = predicting_layer_data[predicting_layer_data$State == i, ]
+  state_count = temp_training_df$layer.count.y[1]
+  if (state_count != -47){
+    diff = state_count - sum(temp_training_df$layerCount)
+    counties_count = sum(temp_prediction_df$layerCount)
+    scaling_factor = diff / counties_count
+    
+    #REESE
+    #*
+    ##for {counties in 1:(length(temp_training_df$county_count==-47)))
+    
+    
+    
+    ## were there States with (D)
+    ## for counties with missing data, normalize their predictions to convert to proportions
+    ## prediction is then these proportions * diff
+    predicting_layer_data$layerCount[predicting_layer_data$State == i] = 
+      round(predicting_layer_data$layerCount[predicting_layer_data$State == i] * scaling_factor)
+  }
+}
+
+concat = rbind(training_linear_model_data_layer, predicting_layer_data)
+
+```
+
+```{r}
+counties <- map_data("county")
+counties$subregion[is.na(counties$subregion)] <- "none"
+counties$subregion <- gsub(" ", "", counties$subregion)
+
+county_subset_map <- merge(counties, concat, sort = FALSE, by.x = c('region', 'subregion'), by.y = c('State', 'County'), all = TRUE)
+county_subset_map <- county_subset_map[order(county_subset_map$order), ]
+
+plot_title <- gsub("\\.", " ", count_variables["layerCount"]) 
+p <- ggplot(county_subset_map, aes(long, lat)) +
+  geom_polygon(aes(group = group, fill = get("layerCount"))) +
+  geom_path(data = states, aes(long, lat, group = group), color = "black") +
+  coord_map("albers",  lat0 = 45.5, lat1 = 29.5) +
+  labs(title = "layer Count Filled", fill = "Count")  
+
+print(p)
+```
+
+```{r}
+#Read in csv files
+linear_model_data_cattle = read.csv("../Data/Animal Linear Model Data/linear_model_data_cattle.csv")
+linear_model_data_cattle <- na.omit(linear_model_data_cattle)
+
+
+training_linear_model_data_cattle = linear_model_data_cattle[linear_model_data_cattle$cattle.count.x != -47, ]
+training_linear_model_data_cattle = training_linear_model_data_cattle[complete.cases(training_linear_model_data_cattle["state"]), ]
+
+# Define the proportion of the data to be used for training
+trainIndex <- createDataPartition(training_linear_model_data_cattle$cattle.count.x, p = 0.8, 
+                                  list = FALSE, 
+                                  times = 1)
+
+# Create the training and testing sets
+trainData <- training_linear_model_data_cattle[trainIndex,]
+testData <- training_linear_model_data_cattle[-trainIndex,]
+
+linear_model_cattle = zeroinfl(cattle.count.x ~ cattle_count_summed + surrounding_population_density + population_density + cattle.farms.x + cattle.count.y + Population..2020.census. + Area..mi.2., dist = "poisson",  data = training_linear_model_data_cattle, maxit = 1000)
+stargazer(
+  linear_model_cattle,
+  type = 'text', 
+  covariate.labels = c(
+    'Surrounding Cattle Count', 'Surrounding Cattle Density', 'Surrounding Population Density', "Cattle Farms", "Total State Cattle Count", "County Population", "County Area"
+    )
+)
+
+# Predict on training and test data
+train_predictions <- predict(linear_model_cattle, newdata = trainData, type = "response")
+test_predictions <- predict(linear_model_cattle, newdata = testData, type = "response")
+
+# Calculate Mean Absolute Error (MAE)
+mae <- function(actual, predicted) {
+  mean(abs(actual - predicted))
+}
+
+train_mae <- mae(trainData$cattle.count.x, train_predictions)
+test_mae <- mae(testData$cattle.count.x, test_predictions)
+
+# Print the MAE for both training and test sets
+cat("Training MAE:", train_mae, "\n")
+cat("Test MAE:", test_mae, "\n")
+
+testing_cattle_data = linear_model_data_cattle[linear_model_data_cattle$cattle.count.x == -47, ]
+predicting_cattle_data = testing_cattle_data[ , !(names(testing_cattle_data) == "cattle.count.x")]
+
+predicting_cattle_data$cattle.count.x = predict(linear_model_cattle, newdata = predicting_cattle_data, type = "response")
+predicting_cattle_data = predicting_cattle_data[complete.cases(predicting_cattle_data["state"]), ]
+predicting_cattle_data
+
+```
+
+```{r}
+concat = rbind(training_linear_model_data_cattle, predicting_cattle_data)
+state_names = unique(concat$state)
+
+for (i in state_names){
+  temp_training_df = training_linear_model_data_cattle[training_linear_model_data_cattle$state == i, ]
+  temp_prediction_df = predicting_cattle_data[predicting_cattle_data$state == i, ]
+  state_count = temp_training_df$cattle.count.y[1]
+  if (state_count != -47){
+    diff = state_count - sum(temp_training_df$cattle.count.x)
+    counties_count = sum(temp_prediction_df$cattle.count.x)
+    scaling_factor = diff / counties_count
+    
+    predicting_cattle_data$cattle.count.x[predicting_cattle_data$state == i] = 
+      round(predicting_cattle_data$cattle.count.x[predicting_cattle_data$state == i] * scaling_factor)
+  }
+}
+
+concat = rbind(training_linear_model_data_cattle, predicting_cattle_data)
+
+```
+
+```{r}
+concat = rbind(training_linear_model_data_cattle, predicting_cattle_data)
+
+counties <- map_data("county")
+counties$subregion[is.na(counties$subregion)] <- "none"
+counties$subregion <- gsub(" ", "", counties$subregion)
+
+county_subset_map <- merge(counties, concat, sort = FALSE, by.x = c('region', 'subregion'), by.y = c('state', 'county.x'), all = TRUE)
+county_subset_map <- county_subset_map[order(county_subset_map$order), ]
+
+plot_title <- gsub("\\.", " ", count_variables["cattle.count.x"]) 
+p <- ggplot(county_subset_map, aes(long, lat)) +
+  geom_polygon(aes(group = group, fill = get("cattle.count.x"))) +
+  geom_path(data = states, aes(long, lat, group = group), color = "black") +
+  coord_map("albers",  lat0 = 45.5, lat1 = 29.5) +
+  labs(title = "cattle Count Filled", fill = "Count")  
+
+print(p)
+```
+
+## Zero Inflated Poisson Model
+
