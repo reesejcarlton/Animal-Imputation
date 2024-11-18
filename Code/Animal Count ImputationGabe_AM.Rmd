@@ -75,10 +75,13 @@ missing <- 0
 for (i in 1:nrow(state_subset)) {
   state <- state_subset$state[i]
   county_subset2 <- county_subset[county_subset$state==state,]
-  missing <- missing + (state_subset$hog.count[i] - sum(county_subset2$hog.count, na.rm=TRUE)) 
+  county_subset2$cattle.count <- apply(cbind(rep(0,nrow(county_subset2)), county_subset2$cattle.count),1,max, na.rm=TRUE)
+  missing <- missing + (state_subset$cattle.count[i] - sum(county_subset2$cattle.count, na.rm=TRUE)) 
 }
 
 ```
+
+
 ```{r}
 #Get a list of all the US states
 states <- map_data("state")
@@ -96,24 +99,36 @@ county_subset_map <- county_subset_map[order(county_subset_map$order), ]
 #Create a vector of animal names for plot
 count_variables <- c("hog.count", "cattle.count", "broiler.count", "layer.count", "sheep.count")
 
-threshold <- c(15000, 2000000, 1.25*10^8 , 7500000, 100000)
+threshold <- c(10000, 200000, 1.*10^6 , 7500000, 100000)
+county_subset_map3 <- county_subset_map
+#*
+#*
+#Animal Unit Calculation
+#*
+#*have to make "-47" an N/A
+county_subset_map3$animal.unit <- c(county_subset_map3$cattle.count+county_subset_map3$hog.count*0.4+county_subset_map3$sheep.count*0.2+(county_subset_map3$broiler.count+county_subset_map3$layer.count)*0.008)
+#hist(county_subset_map3$animal.unit)
 
 
 #Loop through the different animal names to plot each animal count data
 for (i in 1:length(count_variables)) {
   county_subset_map2 <- county_subset_map
   county_subset_map2[count_variables[i]] <- apply(data.frame(rep(threshold[i],nrow(county_subset_map)), county_subset_map2[count_variables[i]]),1,min) 
+  nas <- which(is.na(county_subset_map2[count_variables[i]]))
+  county_subset_map2[count_variables[i]][nas,1] <- 0
+  nas <- which((county_subset_map2[count_variables[i]])==-47)
+  county_subset_map2[count_variables[i]][nas,1] <- NA
   plot_title <- gsub("\\.", " ", count_variables[i]) 
   p <- ggplot(county_subset_map2, aes(long, lat)) +
     geom_polygon(aes(group = group, fill = get(count_variables[i]))) +
-    geom_path(data = states, aes(long, lat, group = group), color = "black") +
+    geom_path(data = states, aes(long, lat, group = group), color = "black", lwd=0.1) +
     coord_map("albers",  lat0 = 45.5, lat1 = 29.5) +
     labs(title = plot_title, fill = "Count")  +
-    scale_fill_gradient(name="Count",low="white", high="red") 
+    scale_fill_gradient(name="Count",low="goldenrod2", high="tomato2") 
   
-  #Make the counties red when their animal county is -47
+  #Hihglight the counties  when their animal county # is -47
   red_counties <- county_subset_map[county_subset_map[[count_variables[i]]] == -47, ]
-  p <- p + geom_polygon(data = red_counties, aes(group = group), fill = "white")
+  p <- p + geom_polygon(data = red_counties, aes(group = group), fill = "dodgerblue4")
 
   
   print(p)
@@ -339,7 +354,7 @@ concat = rbind(training_linear_model_data_hog, predicting_hog_data)
 ```
 
 ```{r}
-threshold <- c(15000, 2000000, 1.25*10^8 , 7500000, 100000)
+#threshold <- c(15000, 2000000, 1.25*10^8 , 7500000, 100000)
 
 counties <- map_data("county")
 counties$subregion[is.na(counties$subregion)] <- "none"
@@ -357,7 +372,7 @@ p <- ggplot(county_subset_map2, aes(long, lat)) +
   geom_path(data = states, aes(long, lat, group = group), color = "black") +
   coord_map("albers",  lat0 = 45.5, lat1 = 29.5) +
   labs(title = "hog Count Filled", fill = "Count")  +
-    scale_fill_gradient(name="hogCount",low="white", high="red") 
+    scale_fill_gradient(name="hogCount",low="goldenrod2", high="tomato2") 
 
 print(p)
 ```
@@ -455,16 +470,32 @@ counties$subregion <- gsub(" ", "", counties$subregion)
 
 county_subset_map <- merge(counties, concat, sort = FALSE, by.x = c('region', 'subregion'), by.y = c('State', 'County'), all = TRUE)
 county_subset_map <- county_subset_map[order(county_subset_map$order), ]
-
+county_subset_map2 <- county_subset_map
+county_subset_map2["broilerCount"] <- apply(data.frame(rep(threshold[3],nrow(county_subset_map)), county_subset_map2["broilerCount"]),1,min) 
 plot_title <- gsub("\\.", " ", count_variables["broilerCount"]) 
-p <- ggplot(county_subset_map, aes(long, lat)) +
+p <- ggplot(county_subset_map2, aes(long, lat)) +
   geom_polygon(aes(group = group, fill = get("broilerCount"))) +
   geom_path(data = states, aes(long, lat, group = group), color = "black") +
   coord_map("albers",  lat0 = 45.5, lat1 = 29.5) +
-  labs(title = "broiler Count Filled", fill = "Count")  
+  labs(title = "broiler Count Filled", fill = "Count") +  
+  scale_fill_gradient(name="broilerCount",low="goldenrod2", high="tomato2") 
+ 
+  #*
+  #* 
+  #*
+  #*county_subset_map2 <- county_subset_map
+#plot_title <- gsub("\\.", " ", count_variables["hogCount"]) 
+#p <- ggplot(county_subset_map2, aes(long, lat)) +
+#  geom_polygon(aes(group = group, fill = get("hogCount"))) +
+#  geom_path(data = states, aes(long, lat, group = group), color = "black") +
+#  coord_map("albers",  lat0 = 45.5, lat1 = 29.5) +
+#  labs(title = "hog Count Filled", fill = "Count")  +
+#    scale_fill_gradient(name="hogCount",low="goldenrod2", high="tomato2") 
 
 print(p)
 ```
+
+
 
 ### Layer Negative Binomial
 
