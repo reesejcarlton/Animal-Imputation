@@ -64,7 +64,6 @@ neighboring_count_summed
 usda_w_pop_and_area_simplified = dplyr::select(usda_w_pop_and_area, "region", 
                                         "subregion", 
                                         "Population..2020.census.", 
-                                        "Area..mi.2.",
                                         "cattle.farms",
                                         "cattle.count",
                                         "hog.farm",
@@ -425,12 +424,13 @@ linear_model_data_cattle = merge(
   )
 
 county_income = read.csv("../Data/county_per_capita_income.csv")                                                                               
-
 county_income$State <- tolower(county_income$State)    
 county_income$County <- tolower(county_income$County)
 county_income$County <- gsub(" ", "", county_income$County)  
 county_income$County <- gsub("\\.", "", county_income$County)   
+county_income$County <- gsub("'", "", county_income$County)   
 county_income$X2022 <- gsub(",", "", county_income$X2022) 
+county_income$County <- gsub("doñaana", "donaana", county_income$County)   
 county_income = transform(county_income, X2022 = as.numeric(X2022))
                                  
 linear_model_data_cattle = merge(

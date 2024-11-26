@@ -34,7 +34,8 @@ Seeing the large number of counties and some states that had D value for certain
 
 To find the data on surrounding counties, the County Adjacency File ("https://www.census.gov/geographies/reference-files/time-series/geo/county-adjacency.html") was used which included a list of every counties and those that bordered it. From here, we summed the population, area and animal counts for every county's surrounding counties and added it to our initial Census of Agricultural dataset.
 
-The two linear models we looked into were the Negative Binomial Linear Regression model and the Poisson Linear Regression Model. Both of these models excel for count data as they are limited to not be zero. The Poisson Linear Regression model makes the assumption that the data's mean roughly equal the data's variance, with the ability to handle the large number of counties that have zero animals. On the other handle, Negative Binomial Linear Regression doesn't require the assumption of the data's mean equaling its variance, as it has an over dispersion term to control the extent of the variation.
+The two linear models we looked into were the Negative Poisson
+Linear Regression model and the Poisson Linear Regression Model. Both of these models excel for count data as they are limited to not be zero. The Poisson Linear Regression model makes the assumption that the data's mean roughly equal the data's variance, with the ability to handle the large number of counties that have zero animals. On the other handle, Negative Poisson Linear Regression doesn't require the assumption of the data's mean equaling its variance, as it has an over dispersion term to control the extent of the variation.
 
 ## Map Plots
 ```{r}
@@ -99,7 +100,7 @@ for (i in 1:length(count_variables)) {
 ## Zero Inflated Poisson Code
 
 
-### Sheep Negative Binomial
+### Sheep Negative Poisson
 
 ```{r}
 
@@ -168,17 +169,13 @@ predicting_sheep_data = predicting_sheep_data[complete.cases(predicting_sheep_da
 predicting_sheep_data
 
 ```
-```{r}
-#Create a plot of the actual vs prediction. I am only a computer model
-plot(trainData$sheepCount,trainData$test_predictions, xlim=c(0,2000),ylim=c(0,2000))
-```
 
 
 ```{r}
 
 #Concatenate the predicted values back to the overall animal count dataset
 concat = rbind(training_linear_model_data_sheep, predicting_sheep_data)
-state_names = unique(concat$state)
+state_names = unique(concat$State)
 
 #This for loop scales the predictions of the regression model to the state totals. Helps address any error present in the model
 for (i in state_names){
@@ -198,7 +195,7 @@ for (i in state_names){
 }
 
 #Add the scaled data back to the total data set
-concat = rbind(training_linear_model_data_sheep, predicting_sheep_data)
+sheep_concat = rbind(training_linear_model_data_sheep, predicting_sheep_data)
 
 ```
 
@@ -211,14 +208,14 @@ counties$subregion[is.na(counties$subregion)] <- "none"
 counties$subregion <- gsub(" ", "", counties$subregion)
 
 #Concatenate the counties list with the animal count data
-county_subset_map <- merge(counties, concat, sort = FALSE, by.x = c('region', 'subregion'), by.y = c('State', 'County'), all = TRUE)
+county_subset_map <- merge(counties, sheep_concat, sort = FALSE, by.x = c('region', 'subregion'), by.y = c('State', 'County'), all = TRUE)
 na_rows <- county_subset_map[!complete.cases(county_subset_map), ]
 
-county_subset_map <- county_subset_map[order(county_subset_map$order), ]
+county_subset_map_sheep <- county_subset_map[order(county_subset_map$order), ]
 
 #Plot the map of the animal count data over the US
 plot_title <- gsub("\\.", " ", count_variables["sheepCount"]) 
-p <- ggplot(county_subset_map, aes(long, lat)) +
+p <- ggplot(county_subset_map_sheep, aes(long, lat)) +
   geom_polygon(aes(group = group, fill = get("sheepCount"))) +
   geom_path(data = states, aes(long, lat, group = group), color = "black") +
   coord_map("albers",  lat0 = 45.5, lat1 = 29.5) +
@@ -227,7 +224,7 @@ p <- ggplot(county_subset_map, aes(long, lat)) +
 print(p)
 ```
 
-### Hog Negative Binomial
+### Hog Negative Poisson
 
 ```{r}
 set.seed(123)
@@ -293,23 +290,23 @@ predicting_hog_data
 
 ```{r}
 concat = rbind(training_linear_model_data_hog, predicting_hog_data)
-state_names = unique(concat$state)
+state_names = unique(concat$State)
 
 for (i in state_names){
-  temp_training_df = training_linear_model_data_hog[training_linear_model_data_hog$state == i, ]
-  temp_prediction_df = predicting_hog_data[predicting_hog_data$state == i, ]
-  state_count = temp_training_df$hog.count.y[1]
+  temp_training_df = training_linear_model_data_hog[training_linear_model_data_hog$State == i, ]
+  temp_prediction_df = predicting_hog_data[predicting_hog_data$State == i, ]
+  state_count = temp_training_df$stateHogCount[1]
   if (state_count != -47){
-    diff = state_count - sum(temp_training_df$hog.count.x)
-    counties_count = sum(temp_prediction_df$hog.count.x)
+    diff = state_count - sum(temp_training_df$hogCount)
+    counties_count = sum(temp_prediction_df$hogCount)
     scaling_factor = diff / counties_count
     
-    predicting_hog_data$hog.count.x[predicting_hog_data$state == i] = 
-      round(predicting_hog_data$hog.count.x[predicting_hog_data$state == i] * scaling_factor)
+    predicting_hog_data$hogCount[predicting_hog_data$State == i] = 
+      round(predicting_hog_data$hogCount[predicting_hog_data$State == i] * scaling_factor)
   }
 }
 
-concat = rbind(training_linear_model_data_hog, predicting_hog_data)
+hog_concat = rbind(training_linear_model_data_hog, predicting_hog_data)
 
 ```
 
@@ -318,11 +315,11 @@ counties <- map_data("county")
 counties$subregion[is.na(counties$subregion)] <- "none"
 counties$subregion <- gsub(" ", "", counties$subregion)
 
-county_subset_map <- merge(counties, concat, sort = FALSE, by.x = c('region', 'subregion'), by.y = c('State', 'County'), all = TRUE)
-county_subset_map <- county_subset_map[order(county_subset_map$order), ]
+county_subset_map <- merge(counties, hog_concat, sort = FALSE, by.x = c('region', 'subregion'), by.y = c('State', 'County'), all = TRUE)
+county_subset_map_hog <- county_subset_map[order(county_subset_map$order), ]
 
 plot_title <- gsub("\\.", " ", count_variables["hogCount"]) 
-p <- ggplot(county_subset_map, aes(long, lat)) +
+p <- ggplot(county_subset_map_hog, aes(long, lat)) +
   geom_polygon(aes(group = group, fill = get("hogCount"))) +
   geom_path(data = states, aes(long, lat, group = group), color = "black") +
   coord_map("albers",  lat0 = 45.5, lat1 = 29.5) +
@@ -331,7 +328,7 @@ p <- ggplot(county_subset_map, aes(long, lat)) +
 print(p)
 ```
 
-### Broiler Negative Binomial
+### Broiler Negative Poisson
 
 ```{r}
 set.seed(123)
@@ -397,7 +394,7 @@ predicting_broiler_data
 
 ```{r}
 concat = rbind(training_linear_model_data_broiler, predicting_broiler_data)
-state_names = unique(concat$state)
+state_names = unique(concat$State)
 
 for (i in state_names){
   temp_training_df = training_linear_model_data_broiler[training_linear_model_data_broiler$State == i, ]
@@ -413,7 +410,7 @@ for (i in state_names){
   }
 }
 
-concat = rbind(training_linear_model_data_broiler, predicting_broiler_data)
+broiler_concat = rbind(training_linear_model_data_broiler, predicting_broiler_data)
 
 ```
 
@@ -422,11 +419,11 @@ counties <- map_data("county")
 counties$subregion[is.na(counties$subregion)] <- "none"
 counties$subregion <- gsub(" ", "", counties$subregion)
 
-county_subset_map <- merge(counties, concat, sort = FALSE, by.x = c('region', 'subregion'), by.y = c('State', 'County'), all = TRUE)
-county_subset_map <- county_subset_map[order(county_subset_map$order), ]
+county_subset_map <- merge(counties, broiler_concat, sort = FALSE, by.x = c('region', 'subregion'), by.y = c('State', 'County'), all = TRUE)
+county_subset_map_broiler <- county_subset_map[order(county_subset_map$order), ]
 
 plot_title <- gsub("\\.", " ", count_variables["broilerCount"]) 
-p <- ggplot(county_subset_map, aes(long, lat)) +
+p <- ggplot(county_subset_map_broiler, aes(long, lat)) +
   geom_polygon(aes(group = group, fill = get("broilerCount"))) +
   geom_path(data = states, aes(long, lat, group = group), color = "black") +
   coord_map("albers",  lat0 = 45.5, lat1 = 29.5) +
@@ -435,7 +432,7 @@ p <- ggplot(county_subset_map, aes(long, lat)) +
 print(p)
 ```
 
-### Layer Negative Binomial
+### Layer Negative Poisson
 
 ```{r}
 set.seed(123)
@@ -501,12 +498,12 @@ predicting_layer_data
 
 ```{r}
 concat = rbind(training_linear_model_data_layer, predicting_layer_data)
-state_names = unique(concat$state)
+state_names = unique(concat$State)
 
 for (i in state_names){
   temp_training_df = training_linear_model_data_layer[training_linear_model_data_layer$State == i, ]
   temp_prediction_df = predicting_layer_data[predicting_layer_data$State == i, ]
-  state_count = temp_training_df$layer.count.y[1]
+  state_count = temp_training_df$stateLayerCount[1]
   if (state_count != -47){
     diff = state_count - sum(temp_training_df$layerCount)
     counties_count = sum(temp_prediction_df$layerCount)
@@ -517,7 +514,7 @@ for (i in state_names){
   }
 }
 
-concat = rbind(training_linear_model_data_layer, predicting_layer_data)
+layer_concat = rbind(training_linear_model_data_layer, predicting_layer_data)
 
 ```
 
@@ -526,11 +523,11 @@ counties <- map_data("county")
 counties$subregion[is.na(counties$subregion)] <- "none"
 counties$subregion <- gsub(" ", "", counties$subregion)
 
-county_subset_map <- merge(counties, concat, sort = FALSE, by.x = c('region', 'subregion'), by.y = c('State', 'County'), all = TRUE)
-county_subset_map <- county_subset_map[order(county_subset_map$order), ]
+county_subset_map <- merge(counties, layer_concat, sort = FALSE, by.x = c('region', 'subregion'), by.y = c('State', 'County'), all = TRUE)
+county_subset_map_layer <- county_subset_map[order(county_subset_map$order), ]
 
 plot_title <- gsub("\\.", " ", count_variables["layerCount"]) 
-p <- ggplot(county_subset_map, aes(long, lat)) +
+p <- ggplot(county_subset_map_layer, aes(long, lat)) +
   geom_polygon(aes(group = group, fill = get("layerCount"))) +
   geom_path(data = states, aes(long, lat, group = group), color = "black") +
   coord_map("albers",  lat0 = 45.5, lat1 = 29.5) +
@@ -544,88 +541,21 @@ print(p)
 linear_model_data_cattle = read.csv("../Data/Animal Linear Model Data/linear_model_data_cattle.csv")
 linear_model_data_cattle <- na.omit(linear_model_data_cattle)
 
-
-training_linear_model_data_cattle = linear_model_data_cattle[linear_model_data_cattle$cattle.count.x != -47, ]
-training_linear_model_data_cattle = training_linear_model_data_cattle[complete.cases(training_linear_model_data_cattle["state"]), ]
-
-# Define the proportion of the data to be used for training
-trainIndex <- createDataPartition(training_linear_model_data_cattle$cattle.count.x, p = 0.8, 
-                                  list = FALSE, 
-                                  times = 1)
-
-# Create the training and testing sets
-trainData <- training_linear_model_data_cattle[trainIndex,]
-testData <- training_linear_model_data_cattle[-trainIndex,]
-
-linear_model_cattle = zeroinfl(cattle.count.x ~ cattle_count_summed + surrounding_population_density + population_density + cattle.farms.x + cattle.count.y + Population..2020.census. + Area..mi.2., dist = "poisson",  data = training_linear_model_data_cattle, maxit = 1000)
-stargazer(
-  linear_model_cattle,
-  type = 'text', 
-  covariate.labels = c(
-    'Surrounding Cattle Count', 'Surrounding Cattle Density', 'Surrounding Population Density', "Cattle Farms", "Total State Cattle Count", "County Population", "County Area"
-    )
-)
-
-# Predict on training and test data
-train_predictions <- predict(linear_model_cattle, newdata = trainData, type = "response")
-test_predictions <- predict(linear_model_cattle, newdata = testData, type = "response")
-
-# Calculate Mean Absolute Error (MAE)
-mae <- function(actual, predicted) {
-  mean(abs(actual - predicted))
-}
-
-train_mae <- mae(trainData$cattle.count.x, train_predictions)
-test_mae <- mae(testData$cattle.count.x, test_predictions)
-
-# Print the MAE for both training and test sets
-cat("Training MAE:", train_mae, "\n")
-cat("Test MAE:", test_mae, "\n")
-
-testing_cattle_data = linear_model_data_cattle[linear_model_data_cattle$cattle.count.x == -47, ]
-predicting_cattle_data = testing_cattle_data[ , !(names(testing_cattle_data) == "cattle.count.x")]
-
-predicting_cattle_data$cattle.count.x = predict(linear_model_cattle, newdata = predicting_cattle_data, type = "response")
-predicting_cattle_data = predicting_cattle_data[complete.cases(predicting_cattle_data["state"]), ]
-predicting_cattle_data
-
 ```
 
 ```{r}
-concat = rbind(training_linear_model_data_cattle, predicting_cattle_data)
-state_names = unique(concat$state)
-
-for (i in state_names){
-  temp_training_df = training_linear_model_data_cattle[training_linear_model_data_cattle$state == i, ]
-  temp_prediction_df = predicting_cattle_data[predicting_cattle_data$state == i, ]
-  state_count = temp_training_df$cattle.count.y[1]
-  if (state_count != -47){
-    diff = state_count - sum(temp_training_df$cattle.count.x)
-    counties_count = sum(temp_prediction_df$cattle.count.x)
-    scaling_factor = diff / counties_count
-    
-    predicting_cattle_data$cattle.count.x[predicting_cattle_data$state == i] = 
-      round(predicting_cattle_data$cattle.count.x[predicting_cattle_data$state == i] * scaling_factor)
-  }
-}
-
-concat = rbind(training_linear_model_data_cattle, predicting_cattle_data)
-
-```
-
-```{r}
-concat = rbind(training_linear_model_data_cattle, predicting_cattle_data)
+cattle_concat = linear_model_data_cattle
 
 counties <- map_data("county")
 counties$subregion[is.na(counties$subregion)] <- "none"
 counties$subregion <- gsub(" ", "", counties$subregion)
 
-county_subset_map <- merge(counties, concat, sort = FALSE, by.x = c('region', 'subregion'), by.y = c('state', 'county.x'), all = TRUE)
-county_subset_map <- county_subset_map[order(county_subset_map$order), ]
+county_subset_map <- merge(counties, linear_model_data_cattle, sort = FALSE, by.x = c('region', 'subregion'), by.y = c('State', 'County'), all = TRUE)
+county_subset_map_cattle <- county_subset_map[order(county_subset_map$order), ]
 
-plot_title <- gsub("\\.", " ", count_variables["cattle.count.x"]) 
-p <- ggplot(county_subset_map, aes(long, lat)) +
-  geom_polygon(aes(group = group, fill = get("cattle.count.x"))) +
+plot_title <- gsub("\\.", " ", count_variables["cattleCount"]) 
+p <- ggplot(county_subset_map_cattle, aes(long, lat)) +
+  geom_polygon(aes(group = group, fill = get("cattleCount"))) +
   geom_path(data = states, aes(long, lat, group = group), color = "black") +
   coord_map("albers",  lat0 = 45.5, lat1 = 29.5) +
   labs(title = "cattle Count Filled", fill = "Count")  
@@ -633,5 +563,152 @@ p <- ggplot(county_subset_map, aes(long, lat)) +
 print(p)
 ```
 
-## Zero Inflated Poisson Model
+## Summed map - After
+
+```{r}
+sheep_concat_total = dplyr::select(sheep_concat, "State", "County", "sheepCount")
+hog_concat_total = dplyr::select(hog_concat, "State", "County", "hogCount")
+broiler_concat_total = dplyr::select(broiler_concat, "State", "County", "broilerCount")
+layer_concat_total = dplyr::select(layer_concat, "State", "County", "layerCount")
+cattle_concat_total = dplyr::select(cattle_concat, "State", "County", "cattleCount")
+
+dfs <- list(
+  sheep_concat_total %>% rename(animalCount = sheepCount),
+  hog_concat_total %>% rename(animalCount = hogCount),
+  broiler_concat_total %>% rename(animalCount = broilerCount),
+  layer_concat_total %>% rename(animalCount = layerCount),
+  cattle_concat_total %>% rename(animalCount = cattleCount)
+)
+
+# Combining all dataframes
+merged_df <- merge(sheep_concat_total, hog_concat_total, by = c("State", "County"), all = TRUE)
+merged_df <- merge(merged_df, broiler_concat_total, by = c("State", "County"), all = TRUE)
+merged_df <- merge(merged_df, layer_concat_total, by = c("State", "County"), all = TRUE)
+merged_df <- merge(merged_df, cattle_concat_total, by = c("State", "County"), all = TRUE)
+merged_df <- merged_df %>%
+  mutate(
+    weighted_sheep = sheepCount * 0.2,
+    weighted_hog = hogCount * 0.4,
+    weighted_chickens = (broilerCount + layerCount) * 0.008,
+    weighted_cattle = cattleCount  # Cattle count remains unchanged (no weight given)
+  )
+
+merged_df$totalCount <- rowSums(
+  merged_df[, c("weighted_sheep", "weighted_hog", "weighted_chickens", "weighted_cattle")],
+  na.rm = TRUE
+)
+
+```
+
+
+```{r}
+counties <- map_data("county")
+counties$subregion[is.na(counties$subregion)] <- "none"
+counties$subregion <- gsub(" ", "", counties$subregion)
+
+county_subset_map <- merge(counties, merged_df, sort = FALSE, by.x = c('region', 'subregion'), by.y = c('State', 'County'), all = TRUE)
+county_subset_map <- county_subset_map[order(county_subset_map$order), ]
+
+plot_title <- gsub("\\.", " ", count_variables["totalCount"]) 
+p <- ggplot(county_subset_map, aes(long, lat)) +
+  geom_polygon(aes(group = group, fill = get("totalCount"))) +
+  geom_path(data = states, aes(long, lat, group = group), color = "black") +
+  coord_map("albers",  lat0 = 45.5, lat1 = 29.5) +
+  labs(title = "Animal Count Filled", fill = "Count")  
+
+print(p)
+```
+## Summed map - After
+
+```{r}
+sheep_initial_total = dplyr::select(linear_model_data_sheep, "State", "County", "sheepCount")
+hog_initial_total = dplyr::select(linear_model_data_hog, "State", "County", "hogCount")
+broiler_initial_total = dplyr::select(linear_model_data_broiler, "State", "County", "broilerCount")
+layer_initial_total = dplyr::select(linear_model_data_layer, "State", "County", "layerCount")
+cattle_initial_total = dplyr::select(linear_model_data_cattle, "State", "County", "cattleCount")
+
+sheep_initial_total <- sheep_initial_total %>%
+  dplyr::mutate(sheepCount = dplyr::case_when(
+    sheepCount == -47 ~ 0,
+    TRUE ~ sheepCount
+  ))
+
+hog_initial_total <- hog_initial_total %>%
+  dplyr::mutate(hogCount = dplyr::case_when(
+    hogCount == -47 ~ 0,
+    TRUE ~ hogCount
+  ))
+
+broiler_initial_total <- broiler_initial_total %>%
+  dplyr::mutate(broilerCount = dplyr::case_when(
+    broilerCount == -47 ~ 0,
+    TRUE ~ broilerCount
+  ))
+
+layer_initial_total <- layer_initial_total %>%
+  dplyr::mutate(layerCount = dplyr::case_when(
+    layerCount == -47 ~ 0,
+    TRUE ~ layerCount
+  ))
+
+cattle_initial_total <- cattle_initial_total %>%
+  dplyr::mutate(cattleCount = dplyr::case_when(
+    cattleCount == -47 ~ 0,
+    TRUE ~ cattleCount
+  ))
+
+
+# Combining all dataframes
+merged_df_initial <- merge(sheep_initial_total, hog_initial_total, by = c("State", "County"), all = TRUE)
+merged_df_initial <- merge(merged_df_initial, broiler_concat_total, by = c("State", "County"), all = TRUE)
+merged_df_initial <- merge(merged_df_initial, layer_initial_total, by = c("State", "County"), all = TRUE)
+merged_df_initial <- merge(merged_df_initial, cattle_initial_total, by = c("State", "County"), all = TRUE)
+merged_df_initial <- merged_df_initial %>%
+  mutate(
+    weighted_sheep = sheepCount * 0.2,
+    weighted_hog = hogCount * 0.4,
+    weighted_chickens = (broilerCount + layerCount) * 0.008,
+    weighted_cattle = cattleCount  # Cattle count remains unchanged (no weight given)
+  )
+
+merged_df_initial$totalCount <- rowSums(
+  merged_df_initial[, c("weighted_sheep", "weighted_hog", "weighted_chickens", "weighted_cattle")],
+  na.rm = TRUE
+)
+
+```
+
+```{r}
+counties <- map_data("county")
+counties$subregion[is.na(counties$subregion)] <- "none"
+counties$subregion <- gsub(" ", "", counties$subregion)
+
+county_subset_map <- merge(counties, merged_df_intial, sort = FALSE, by.x = c('region', 'subregion'), by.y = c('State', 'County'), all = TRUE)
+county_subset_map <- county_subset_map[order(county_subset_map$order), ]
+
+plot_title <- gsub("\\.", " ", count_variables["totalCount"]) 
+p <- ggplot(county_subset_map, aes(long, lat)) +
+  geom_polygon(aes(group = group, fill = get("totalCount"))) +
+  geom_path(data = states, aes(long, lat, group = group), color = "black") +
+  coord_map("albers",  lat0 = 45.5, lat1 = 29.5) +
+  labs(title = "Animal Count Filled", fill = "Count")  
+
+print(p)
+```
+```{r}
+# Join the data frames by State and County
+merged_diff <- merge(merged_df_intial, merged_df, by = c("State", "County"))
+
+# Calculate the absolute difference in totalCount
+merged_diff <- merged_diff %>%
+  dplyr::mutate(totalCount_diff = abs(totalCount_initial - totalCount_current))
+
+# Find the row with the largest difference
+largest_diff <- merged_diff %>%
+  dplyr::filter(totalCount_diff == max(totalCount_diff, na.rm = TRUE))
+
+# Display the result
+largest_diff
+
+```
 
