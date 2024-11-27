@@ -23,6 +23,9 @@ library(stargazer)
 usda_data = read.csv("../Data/usda_data.csv")
 head(usda_data, 10)
 neighbor_county_updated = read.csv("../Data/neighbor_county_updated.csv")
+neighbor_county_updated <- neighbor_county_updated[
+  !(neighbor_county_updated$county == neighbor_county_updated$neighboring_county & 
+    neighbor_county_updated$state == neighbor_county_updated$neighboring_state), ]
 head(neighbor_county_updated, 10)
 
 values_to_filter <- c(2527, 1470, 2128, 973, 2431, 3022, 867, 767, 2039, 85, 2243, 1, 298, 2827, 1642, 1299, 1884, 674, 366, 1387, 571, 220, 161, 2206, 2364, 1094, 1215, 2966, 1821, 1585, 2926, 526, 1787, 2782, 1985, 2317, 69, 3095, 1176, 2812, 1159, 1736, 1200, 1765, 285, 1754, 294, 2311)
@@ -45,6 +48,7 @@ usda_w_pop_and_area_simplified = usda_w_pop_and_area_simplified[!duplicated(usda
 neighbor_county_updated <- subset(neighbor_county_updated, county != "buenavistacity")
 neighbor_county_updated <- subset(neighbor_county_updated, neighboring_county != "buenavistacity")
 
+
 neighboring_count =  merge(
   neighbor_county_updated,
   usda_w_pop_and_area_simplified, 
@@ -64,6 +68,7 @@ neighboring_count_summed
 usda_w_pop_and_area_simplified = dplyr::select(usda_w_pop_and_area, "region", 
                                         "subregion", 
                                         "Population..2020.census.", 
+                                        "Area..mi.2.",
                                         "cattle.farms",
                                         "cattle.count",
                                         "hog.farm",

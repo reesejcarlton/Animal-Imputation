@@ -572,14 +572,6 @@ broiler_concat_total = dplyr::select(broiler_concat, "State", "County", "broiler
 layer_concat_total = dplyr::select(layer_concat, "State", "County", "layerCount")
 cattle_concat_total = dplyr::select(cattle_concat, "State", "County", "cattleCount")
 
-dfs <- list(
-  sheep_concat_total %>% rename(animalCount = sheepCount),
-  hog_concat_total %>% rename(animalCount = hogCount),
-  broiler_concat_total %>% rename(animalCount = broilerCount),
-  layer_concat_total %>% rename(animalCount = layerCount),
-  cattle_concat_total %>% rename(animalCount = cattleCount)
-)
-
 # Combining all dataframes
 merged_df <- merge(sheep_concat_total, hog_concat_total, by = c("State", "County"), all = TRUE)
 merged_df <- merge(merged_df, broiler_concat_total, by = c("State", "County"), all = TRUE)
@@ -614,11 +606,11 @@ p <- ggplot(county_subset_map, aes(long, lat)) +
   geom_polygon(aes(group = group, fill = get("totalCount"))) +
   geom_path(data = states, aes(long, lat, group = group), color = "black") +
   coord_map("albers",  lat0 = 45.5, lat1 = 29.5) +
-  labs(title = "Animal Count Filled", fill = "Count")  
+  labs(title = "Animal Count Filled - Post Imputation", fill = "Count")  
 
 print(p)
 ```
-## Summed map - After
+## Summed map - Before
 
 ```{r}
 sheep_initial_total = dplyr::select(linear_model_data_sheep, "State", "County", "sheepCount")
@@ -671,7 +663,7 @@ merged_df_initial <- merged_df_initial %>%
     weighted_cattle = cattleCount  # Cattle count remains unchanged (no weight given)
   )
 
-merged_df_initial$totalCount <- rowSums(
+merged_df_initial$totalCount_initial <- rowSums(
   merged_df_initial[, c("weighted_sheep", "weighted_hog", "weighted_chickens", "weighted_cattle")],
   na.rm = TRUE
 )
@@ -683,32 +675,27 @@ counties <- map_data("county")
 counties$subregion[is.na(counties$subregion)] <- "none"
 counties$subregion <- gsub(" ", "", counties$subregion)
 
-county_subset_map <- merge(counties, merged_df_intial, sort = FALSE, by.x = c('region', 'subregion'), by.y = c('State', 'County'), all = TRUE)
+county_subset_map <- merge(counties, merged_df_initial, sort = FALSE, by.x = c('region', 'subregion'), by.y = c('State', 'County'), all = TRUE)
 county_subset_map <- county_subset_map[order(county_subset_map$order), ]
 
-plot_title <- gsub("\\.", " ", count_variables["totalCount"]) 
+plot_title <- gsub("\\.", " ", count_variables["totalCount_initial"]) 
 p <- ggplot(county_subset_map, aes(long, lat)) +
-  geom_polygon(aes(group = group, fill = get("totalCount"))) +
+  geom_polygon(aes(group = group, fill = get("totalCount_initial"))) +
   geom_path(data = states, aes(long, lat, group = group), color = "black") +
   coord_map("albers",  lat0 = 45.5, lat1 = 29.5) +
-  labs(title = "Animal Count Filled", fill = "Count")  
+  labs(title = "Animal Count Filled - Pre Imputation", fill = "Count")  
 
 print(p)
 ```
 ```{r}
 # Join the data frames by State and County
-merged_diff <- merge(merged_df_intial, merged_df, by = c("State", "County"))
+merged_diff <- merge(merged_df_initial, merged_df, by = c("State", "County"))
 
 # Calculate the absolute difference in totalCount
 merged_diff <- merged_diff %>%
-  dplyr::mutate(totalCount_diff = abs(totalCount_initial - totalCount_current))
+  dplyr::mutate(totalCount_diff = abs(totalCount_initial - totalCount))
 
-# Find the row with the largest difference
-largest_diff <- merged_diff %>%
-  dplyr::filter(totalCount_diff == max(totalCount_diff, na.rm = TRUE))
-
-# Display the result
-largest_diff
+print(merged_diff)
 
 ```
 
