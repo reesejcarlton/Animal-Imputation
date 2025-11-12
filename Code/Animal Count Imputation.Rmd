@@ -9,6 +9,8 @@ knitr::opts_chunk$set(include = FALSE, message = FALSE, warning = FALSE )
 ```
 
 ```{r}
+#install.packages('sets')
+
 library(ggplot2)
 library(dplyr)
 library(data.table)
@@ -123,7 +125,7 @@ trainData <- training_linear_model_data_sheep[trainIndex,]
 testData <- training_linear_model_data_sheep[-trainIndex,]
 
 #Create the zero inflated poisson model on the training set
-linear_model_sheep = zeroinfl(sheepCount ~ surroundingFarmDensity + surroundAnimalDensity + farmDensity + stateSheepFarms + stateSheepCount + surroundingPopulationDensity + populationDensity + personalIncome2022 + tavg_JAN + tavg_FEB + tavg_MAR + tavg_APR + tavg_MAY + tavg_JUN + tavg_JUL + tavg_AUG + tavg_SEP + tavg_OCT + tavg_NOV + tavg_DEC + Area..mi.2.,  dist = "poisson",  data = trainData, maxit = 1000)
+linear_model_sheep = zeroinfl(sheepCount ~ surroundingFarmDensity + surroundAnimalDensity + farmDensity + stateSheepFarms + stateSheepCount + surroundingPopulationDensity + populationDensity + personalIncome2022 + tavg_JAN + tavg_FEB + tavg_MAR + tavg_APR + tavg_MAY + tavg_JUN + tavg_JUL + tavg_AUG + tavg_SEP + tavg_OCT + tavg_NOV + tavg_DEC + Area..mi.2. + corn_fraction + soy_fraction + alfalfa_fraction,  dist = "poisson",  data = trainData, maxit = 1000)
 
 #Create a table of the regression model with each coefficient
 stargazer(
@@ -136,7 +138,7 @@ stargazer(
     'Average Temperature - April', 'Average Temperature - May', 'Average Temperature - June', 
     'Average Temperature - July', 'Average Temperature - August', 'Average Temperature - September', 
     'Average Temperature - October', 'Average Temperature - November', 'Average Temperature - December', 
-    'County Area'
+    'County Area', "Corn Fraction", "Soy Fraction", "Alfalfa Fraction"
   ),
   out = "sheep_output.html"  # Save output as an HTML file
 )
@@ -246,7 +248,7 @@ trainIndex <- createDataPartition(training_linear_model_data_hog$hogCount, p = 0
 trainData <- training_linear_model_data_hog[trainIndex,]
 testData <- training_linear_model_data_hog[-trainIndex,]
 
-linear_model_hog = zeroinfl(hogCount ~ surroundingFarmDensity + surroundAnimalDensity + farmDensity + stateHogFarms + stateHogCount + surroundingPopulationDensity + populationDensity + personalIncome2022 + tavg_JAN + tavg_FEB + tavg_MAR + tavg_APR + tavg_MAY + tavg_JUN + tavg_JUL + tavg_AUG + tavg_SEP + tavg_OCT + tavg_NOV + tavg_DEC + Area..mi.2., data = trainData, maxit = 1000)
+linear_model_hog = zeroinfl(hogCount ~ surroundingFarmDensity + surroundAnimalDensity + farmDensity + stateHogFarms + stateHogCount + surroundingPopulationDensity + populationDensity + personalIncome2022 + tavg_JAN + tavg_FEB + tavg_MAR + tavg_APR + tavg_MAY + tavg_JUN + tavg_JUL + tavg_AUG + tavg_SEP + tavg_OCT + tavg_NOV + tavg_DEC + Area..mi.2. + corn_fraction + soy_fraction + alfalfa_fraction, data = trainData, maxit = 1000)
 
 stargazer(
   linear_model_hog,
@@ -258,7 +260,7 @@ stargazer(
     'Average Temperature - April', 'Average Temperature - May', 'Average Temperature - June', 
     'Average Temperature - July', 'Average Temperature - August', 'Average Temperature - September', 
     'Average Temperature - October', 'Average Temperature - November', 'Average Temperature - December', 
-    'County Area'
+    'County Area', "Corn Fraction", "Soy Fraction", "Alfalfa Fraction"
   ),
   out = "hog_output.html"  # Save output as an HTML file
 )
@@ -350,7 +352,7 @@ trainIndex <- createDataPartition(training_linear_model_data_broiler$broilerCoun
 trainData <- training_linear_model_data_broiler[trainIndex,]
 testData <- training_linear_model_data_broiler[-trainIndex,]
 
-linear_model_broiler = zeroinfl(broilerCount ~ surroundingFarmDensity + surroundAnimalDensity + farmDensity + stateBroilerFarms + stateBroilerCount + surroundingPopulationDensity + populationDensity + personalIncome2022 + tavg_JAN + tavg_FEB + tavg_MAR + tavg_APR + tavg_MAY + tavg_JUN + tavg_JUL + tavg_AUG + tavg_SEP + tavg_OCT + tavg_NOV + tavg_DEC + Area..mi.2.,  data = trainData,  dist = "poisson", maxit = 1000)
+linear_model_broiler = zeroinfl(broilerCount ~ surroundingFarmDensity + surroundAnimalDensity + farmDensity + stateBroilerFarms + stateBroilerCount + surroundingPopulationDensity + populationDensity + personalIncome2022 + tavg_JAN + tavg_FEB + tavg_MAR + tavg_APR + tavg_MAY + tavg_JUN + tavg_JUL + tavg_AUG + tavg_SEP + tavg_OCT + tavg_NOV + tavg_DEC + Area..mi.2. + corn_fraction + soy_fraction + alfalfa_fraction,  data = trainData,  dist = "poisson", maxit = 1000)
 
 stargazer(
   linear_model_broiler,
@@ -362,7 +364,7 @@ stargazer(
     'Average Temperature - April', 'Average Temperature - May', 'Average Temperature - June', 
     'Average Temperature - July', 'Average Temperature - August', 'Average Temperature - September', 
     'Average Temperature - October', 'Average Temperature - November', 'Average Temperature - December', 
-    'County Area'
+    'County Area', "Corn Fraction", "Soy Fraction", "Alfalfa Fraction"
   ),
   out = "broiler_output.html"  # Save output as an HTML file
 )
@@ -454,7 +456,7 @@ trainIndex <- createDataPartition(training_linear_model_data_layer$layerCount, p
 trainData <- training_linear_model_data_layer[trainIndex,]
 testData <- training_linear_model_data_layer[-trainIndex,]
 
-linear_model_layer = zeroinfl(layerCount ~ surroundingFarmDensity + surroundAnimalDensity + farmDensity + stateLayerFarms + stateLayerCount + surroundingPopulationDensity + populationDensity + personalIncome2022 + tavg_JAN + tavg_FEB + tavg_MAR + tavg_APR + tavg_MAY + tavg_JUN + tavg_JUL + tavg_AUG + tavg_SEP + tavg_OCT + tavg_NOV + tavg_DEC + Area..mi.2., dist = "poisson", data = training_linear_model_data_layer, maxit = 1000)
+linear_model_layer = zeroinfl(layerCount ~ surroundingFarmDensity + surroundAnimalDensity + farmDensity + stateLayerFarms + stateLayerCount + surroundingPopulationDensity + populationDensity + personalIncome2022 + tavg_JAN + tavg_FEB + tavg_MAR + tavg_APR + tavg_MAY + tavg_JUN + tavg_JUL + tavg_AUG + tavg_SEP + tavg_OCT + tavg_NOV + tavg_DEC + Area..mi.2. + corn_fraction + soy_fraction + alfalfa_fraction, dist = "poisson", data = training_linear_model_data_layer, maxit = 1000)
 
 stargazer(
   linear_model_layer,
@@ -466,7 +468,7 @@ stargazer(
     'Average Temperature - April', 'Average Temperature - May', 'Average Temperature - June', 
     'Average Temperature - July', 'Average Temperature - August', 'Average Temperature - September', 
     'Average Temperature - October', 'Average Temperature - November', 'Average Temperature - December', 
-    'County Area'
+    'County Area', "Corn Fraction", "Soy Fraction", "Alfalfa Fraction"
   ),
   out = "layer_output.html"  # Save output as an HTML file
 )
@@ -696,6 +698,12 @@ merged_diff <- merged_diff %>%
   dplyr::mutate(totalCount_diff = abs(totalCount_initial - totalCount))
 
 print(merged_diff)
+
+```
+
+```{r}
+x <- merged_df_initial[merged_df_initial$State %in% c('maryland', 'delaware', 'virginia'), ]
+write.csv(x, "MD_VA_DE_Animal_Count_2022.csv", row.names = FALSE)
 
 ```
 

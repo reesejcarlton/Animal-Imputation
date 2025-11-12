@@ -16,6 +16,10 @@ library(sets)
 library(stringr)
 library(tidyr)
 library(stargazer)
+library(tidyverse)
+library(tidycensus)
+library(tigris)
+library(sf)
 ```
 
 
@@ -58,9 +62,11 @@ neighboring_count =  merge(
 )
 neighboring_count_summed <- neighboring_count %>%
   group_by(state, county) %>%
-  summarise(pop_summed = sum(`Population..2020.census.`),
-            area_summed = sum(`Area..mi.2.`))
-neighboring_count_summed
+  summarise(
+    pop_summed = sum(Population..2020.census., na.rm = TRUE),
+    area_summed = sum(Area..mi.2., na.rm = TRUE)
+  )
+
 
 ```
 
@@ -112,6 +118,56 @@ values_to_filter <- c(2029, 10868, 11374)
 neighboring_count <- neighboring_count[-values_to_filter, ]
 
 ```
+
+```{r}
+# Load built-in FIPS reference from tidycensus
+data("fips_codes")
+
+# Load CDL crop raster summary (county-lvel pixel counts)
+cdl_df <- read.csv(file = "../Data/county_pixel_count_2024_10.csv") %>% 
+  rename(fips = Fips) %>%
+  mutate(fips = sprintf("%05d", as.integer(fips)))
+
+# Build FIPS lookup table (state and county names)
+fips_lookup <- fips_codes %>%
+  mutate(fips = paste0(state_code, county_code)) %>%
+  dplyr::select(fips, state = state_name, county) %>%
+  mutate(
+    state = tolower(state),
+    county = tolower(gsub("county", "", county)),
+    county = gsub("[[:space:][:punct:]]", "", county)
+  )
+
+
+# Merge CDL pixel counts with cleaned state and county names
+cdl_named_df <- cdl_df %>%
+  left_join(fips_lookup, by = "fips")
+
+cdl_named_df$county <- gsub("county", "", cdl_named_df$county) 
+cdl_named_df$county <- gsub("parish", "", cdl_named_df$county) 
+cdl_named_df$county <- gsub("miamidade", "miami-dade", cdl_named_df$county) 
+cdl_named_df$county <- ifelse(
+  cdl_named_df$state == "virginia" &
+    !tolower(cdl_named_df$county) %in% c("jamescity", "charlescity"),
+  gsub("city", "", cdl_named_df$county, ignore.case = TRUE),
+  cdl_named_df$county
+)
+
+
+cdl_named_df <- dplyr::select(cdl_named_df,
+                              state,
+                              county,
+                              Category_001,
+                              Category_005,
+                              Category_036)
+
+colnames(cdl_named_df) = c('state',
+                           'county',
+                           'corn_fraction',
+                           'soy_fraction',
+                           "alfalfa_fraction")
+```
+
 
 
 ```{r}
@@ -183,7 +239,24 @@ linear_model_data_sheep = merge(
   by.x = c('state', 'county.x'),
   by.y = c('State', 'County')
   , all = TRUE
-  )    
+  )   
+
+linear_model_data_sheep = merge(
+  linear_model_data_sheep,
+  cdl_named_df,
+  by.x = c('state', 'county.x'),
+  by.y = c('state', 'county')
+  , all = TRUE
+  )
+
+# List of crop fraction columns to update
+crop_cols <- c("corn_fraction", "soy_fraction", "alfalfa_fraction")
+
+# Apply the formula to each crop column
+for (col in crop_cols) {
+  linear_model_data_sheep[[col]] <- linear_model_data_sheep[[col]] * 0.000247105 * 100 / (linear_model_data_sheep$Area..mi.2. * 640)
+}
+
 
 linear_model_data_sheep = dplyr::select(linear_model_data_sheep, 
                                         "state", 
@@ -276,7 +349,10 @@ linear_model_data_sheep = dplyr::select(linear_model_data_sheep,
                                         "tavg_DEC", 
                                         "tmax_DEC", 
                                         "tmin_DEC",
-                                        "X2022")
+                                        "X2022",
+                                        "corn_fraction",
+                                        "soy_fraction",
+                                        "alfalfa_fraction")
 colnames(linear_model_data_sheep) = c(  "State", 
                                         "County", 
                                         "surroundingPopulationSummed", 
@@ -367,7 +443,10 @@ colnames(linear_model_data_sheep) = c(  "State",
                                         "tavg_DEC", 
                                         "tmax_DEC", 
                                         "tmin_DEC",
-                                        "personalIncome2022")
+                                        "personalIncome2022",
+                                        'corn_fraction',
+                                        'soy_fraction',
+                                        "alfalfa_fraction")
                                                                                                                                
 write.csv(linear_model_data_sheep, "../Data/Animal Linear Model Data/linear_model_data_sheep.csv", row.names = FALSE)
 
@@ -444,6 +523,23 @@ linear_model_data_cattle = merge(
   by.x = c('state', 'county.x'),
   by.y = c('State', 'County')
   )    
+
+linear_model_data_cattle = merge(
+  linear_model_data_cattle,
+  cdl_named_df,
+  by.x = c('state', 'county.x'),
+  by.y = c('state', 'county')
+  , all = TRUE
+  )
+
+# List of crop fraction columns to update
+crop_cols <- c("corn_fraction", "soy_fraction", "alfalfa_fraction")
+
+# Apply the formula to each crop column
+for (col in crop_cols) {
+  linear_model_data_cattle[[col]] <- linear_model_data_cattle[[col]] * 0.000247105 * 100 / (linear_model_data_cattle$Area..mi.2. * 640)
+}
+
 
 linear_model_data_cattle = dplyr::select(linear_model_data_cattle, 
                                         "state", 
@@ -534,7 +630,10 @@ linear_model_data_cattle = dplyr::select(linear_model_data_cattle,
                                         "tavg_DEC", 
                                         "tmax_DEC", 
                                         "tmin_DEC",
-                                        "X2022")
+                                        "X2022",
+                                        "corn_fraction",
+                                        "soy_fraction",
+                                        "alfalfa_fraction")
 colnames(linear_model_data_cattle) = c(  "State", 
                                         "County", 
                                         "surroundingPopulationSummed", 
@@ -623,7 +722,10 @@ colnames(linear_model_data_cattle) = c(  "State",
                                         "tavg_DEC", 
                                         "tmax_DEC", 
                                         "tmin_DEC",
-                                        "personalIncome2022")
+                                        "personalIncome2022",
+                                        "corn_fraction",
+                                        "soy_fraction",
+                                        "alfalfa_fraction")
 
 write.csv(linear_model_data_cattle, "../Data/Animal Linear Model Data/linear_model_data_cattle.csv", row.names = FALSE)
 
@@ -699,6 +801,22 @@ linear_model_data_broiler = merge(
   by.x = c('state', 'county.x'),
   by.y = c('State', 'County')
   )    
+
+linear_model_data_broiler = merge(
+  linear_model_data_broiler,
+  cdl_named_df,
+  by.x = c('state', 'county.x'),
+  by.y = c('state', 'county')
+  , all = TRUE
+  )
+
+# List of crop fraction columns to update
+crop_cols <- c("corn_fraction", "soy_fraction", "alfalfa_fraction")
+
+# Apply the formula to each crop column
+for (col in crop_cols) {
+  linear_model_data_broiler[[col]] <- linear_model_data_broiler[[col]] * 0.000247105 * 100 / (linear_model_data_broiler$Area..mi.2. * 640)
+}
 
 linear_model_data_broiler = dplyr::select(linear_model_data_broiler, 
                                         "state", 
@@ -791,7 +909,10 @@ linear_model_data_broiler = dplyr::select(linear_model_data_broiler,
                                         "tavg_DEC", 
                                         "tmax_DEC", 
                                         "tmin_DEC",
-                                        "X2022")
+                                        "X2022",
+                                        "corn_fraction",
+                                        "soy_fraction",
+                                        "alfalfa_fraction")
 colnames(linear_model_data_broiler) = c(  "State", 
                                         "County", 
                                         "surroundingPopulationSummed", 
@@ -882,7 +1003,10 @@ colnames(linear_model_data_broiler) = c(  "State",
                                         "tavg_DEC", 
                                         "tmax_DEC", 
                                         "tmin_DEC",
-                                        "personalIncome2022")
+                                        "personalIncome2022",
+                                        "corn_fraction",
+                                        "soy_fraction",
+                                        "alfalfa_fraction")
 
 write.csv(linear_model_data_broiler, "../Data/Animal Linear Model Data/linear_model_data_broiler.csv", row.names = FALSE)
 
@@ -961,6 +1085,22 @@ linear_model_data_layer = merge(
   by.x = c('state', 'county.x'),
   by.y = c('State', 'County')
   )    
+
+linear_model_data_layer = merge(
+  linear_model_data_layer,
+  cdl_named_df,
+  by.x = c('state', 'county.x'),
+  by.y = c('state', 'county')
+  , all = TRUE
+  )
+
+# List of crop fraction columns to update
+crop_cols <- c("corn_fraction", "soy_fraction", "alfalfa_fraction")
+
+# Apply the formula to each crop column
+for (col in crop_cols) {
+  linear_model_data_layer[[col]] <- linear_model_data_layer[[col]] * 0.000247105 * 100 / (linear_model_data_layer$Area..mi.2. * 640)
+}
 
 linear_model_data_layer = dplyr::select(linear_model_data_layer, 
                                         "state", 
@@ -1053,7 +1193,10 @@ linear_model_data_layer = dplyr::select(linear_model_data_layer,
                                         "tavg_DEC", 
                                         "tmax_DEC", 
                                         "tmin_DEC",
-                                        "X2022")
+                                        "X2022",
+                                        "corn_fraction",
+                                        "soy_fraction",
+                                        "alfalfa_fraction")
 colnames(linear_model_data_layer) = c(  "State", 
                                         "County", 
                                         "surroundingPopulationSummed", 
@@ -1144,7 +1287,10 @@ colnames(linear_model_data_layer) = c(  "State",
                                         "tavg_DEC", 
                                         "tmax_DEC", 
                                         "tmin_DEC",
-                                        "personalIncome2022")
+                                        "personalIncome2022",
+                                        "corn_fraction",
+                                        "soy_fraction",
+                                        "alfalfa_fraction")
 
 write.csv(linear_model_data_layer, "../Data/Animal Linear Model Data/linear_model_data_layer.csv", row.names = FALSE)
 
@@ -1220,6 +1366,22 @@ linear_model_data_hog = merge(
   by.y = c('State', 'County')
   , all = TRUE
   )    
+
+linear_model_data_hog = merge(
+  linear_model_data_hog,
+  cdl_named_df,
+  by.x = c('state', 'county.x'),
+  by.y = c('state', 'county')
+  , all = TRUE
+  )
+
+# List of crop fraction columns to update
+crop_cols <- c("corn_fraction", "soy_fraction", "alfalfa_fraction")
+
+# Apply the formula to each crop column
+for (col in crop_cols) {
+  linear_model_data_hog[[col]] <- linear_model_data_hog[[col]] * 0.000247105 * 100 / (linear_model_data_hog$Area..mi.2. * 640)
+}
 
 linear_model_data_hog = dplyr::select(linear_model_data_hog, 
                                         "state", 
@@ -1312,7 +1474,10 @@ linear_model_data_hog = dplyr::select(linear_model_data_hog,
                                         "tavg_DEC", 
                                         "tmax_DEC", 
                                         "tmin_DEC",
-                                        "X2022")
+                                        "X2022",
+                                        "corn_fraction",
+                                        "soy_fraction",
+                                        "alfalfa_fraction")
 colnames(linear_model_data_hog) = c(  "State", 
                                         "County", 
                                         "surroundingPopulationSummed", 
@@ -1403,7 +1568,10 @@ colnames(linear_model_data_hog) = c(  "State",
                                         "tavg_DEC", 
                                         "tmax_DEC", 
                                         "tmin_DEC",
-                                        "personalIncome2022")
+                                        "personalIncome2022",
+                                        "corn_fraction",
+                                        "soy_fraction",
+                                        "alfalfa_fraction")
 
 head(linear_model_data_hog, 10)
 
