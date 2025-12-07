@@ -153,19 +153,49 @@ cdl_named_df$county <- ifelse(
   cdl_named_df$county
 )
 
+# Define CDL crop categories (skip non-agricultural land types)
+crop_categories <- c(
+  1:6, 10:14, 21:60, 66:77
+)
+
+# Build matching column names
+crop_columns <- paste0("Category_", sprintf("%03d", crop_categories))
+
+# Add total_crop column (safely skips missing columns)
+cdl_named_df <- cdl_named_df %>%
+  mutate(total_crop = rowSums(across(any_of(crop_columns)), na.rm = TRUE),
+         total_crop_fraction = rowSums(across(any_of(crop_columns)), na.rm = TRUE))
+  
 
 cdl_named_df <- dplyr::select(cdl_named_df,
                               state,
                               county,
                               Category_001,
                               Category_005,
-                              Category_036)
+                              Category_036,
+                              total_crop,
+                              total_crop_fraction)
 
 colnames(cdl_named_df) = c('state',
                            'county',
                            'corn_fraction',
                            'soy_fraction',
-                           "alfalfa_fraction")
+                           "alfalfa_fraction",
+                           'total_crop',
+                           'total_crop_fraction')
+
+# Add state-level totals for all crops + major crops
+cdl_named_df <- cdl_named_df %>%
+  group_by(state) %>%
+  mutate(
+    state_total_crop     = sum(total_crop, na.rm = TRUE),
+    state_total_corn     = sum(corn_fraction, na.rm = TRUE),
+    state_total_soy      = sum(soy_fraction, na.rm = TRUE),
+    state_total_alfalfa  = sum(alfalfa_fraction, na.rm = TRUE),
+    state_total_fraction    = sum(total_crop, na.rm = TRUE),
+  ) %>%
+  ungroup()
+
 ```
 
 
@@ -249,14 +279,25 @@ linear_model_data_sheep = merge(
   , all = TRUE
   )
 
+# Add state-level totals for area
+linear_model_data_sheep <- linear_model_data_sheep %>%
+  group_by(state) %>%
+  mutate(
+    state_total_area     = sum(Area..mi.2., na.rm = TRUE)
+  ) %>%
+  ungroup()
+
 # List of crop fraction columns to update
-crop_cols <- c("corn_fraction", "soy_fraction", "alfalfa_fraction")
+crop_cols <- c("corn_fraction", "soy_fraction", "alfalfa_fraction", "total_crop_fraction")
+state_crop_cols <- c("state_total_corn", "state_total_alfalfa", "state_total_soy", "state_total_fraction")
 
 # Apply the formula to each crop column
 for (col in crop_cols) {
   linear_model_data_sheep[[col]] <- linear_model_data_sheep[[col]] * 0.000247105 * 100 / (linear_model_data_sheep$Area..mi.2. * 640)
 }
-
+for (col in state_crop_cols) {
+  linear_model_data_sheep[[col]] <- linear_model_data_sheep[[col]] * 0.000247105 * 100 / (linear_model_data_sheep$state_total_area * 640)
+}
 
 linear_model_data_sheep = dplyr::select(linear_model_data_sheep, 
                                         "state", 
@@ -352,7 +393,14 @@ linear_model_data_sheep = dplyr::select(linear_model_data_sheep,
                                         "X2022",
                                         "corn_fraction",
                                         "soy_fraction",
-                                        "alfalfa_fraction")
+                                        "alfalfa_fraction",
+                                        'total_crop',
+                                        'total_crop_fraction',
+                                        'state_total_crop',
+                                        'state_total_alfalfa',
+                                        'state_total_corn',
+                                        'state_total_soy',
+                                        'state_total_fraction')
 colnames(linear_model_data_sheep) = c(  "State", 
                                         "County", 
                                         "surroundingPopulationSummed", 
@@ -444,9 +492,16 @@ colnames(linear_model_data_sheep) = c(  "State",
                                         "tmax_DEC", 
                                         "tmin_DEC",
                                         "personalIncome2022",
-                                        'corn_fraction',
-                                        'soy_fraction',
-                                        "alfalfa_fraction")
+                                        "corn_fraction",
+                                        "soy_fraction",
+                                        "alfalfa_fraction",
+                                        'total_crop',
+                                        'total_crop_fraction',
+                                        'state_total_crop',
+                                        'state_total_alfalfa',
+                                        'state_total_corn',
+                                        'state_total_soy',
+                                        'state_total_fraction')
                                                                                                                                
 write.csv(linear_model_data_sheep, "../Data/Animal Linear Model Data/linear_model_data_sheep.csv", row.names = FALSE)
 
@@ -810,12 +865,24 @@ linear_model_data_broiler = merge(
   , all = TRUE
   )
 
+# Add state-level totals for area
+linear_model_data_broiler <- linear_model_data_broiler %>%
+  group_by(state) %>%
+  mutate(
+    state_total_area     = sum(Area..mi.2., na.rm = TRUE)
+  ) %>%
+  ungroup()
+
 # List of crop fraction columns to update
-crop_cols <- c("corn_fraction", "soy_fraction", "alfalfa_fraction")
+crop_cols <- c("corn_fraction", "soy_fraction", "alfalfa_fraction", "total_crop_fraction")
+state_crop_cols <- c("state_total_corn", "state_total_alfalfa", "state_total_soy", "state_total_fraction")
 
 # Apply the formula to each crop column
 for (col in crop_cols) {
   linear_model_data_broiler[[col]] <- linear_model_data_broiler[[col]] * 0.000247105 * 100 / (linear_model_data_broiler$Area..mi.2. * 640)
+}
+for (col in state_crop_cols) {
+  linear_model_data_broiler[[col]] <- linear_model_data_broiler[[col]] * 0.000247105 * 100 / (linear_model_data_broiler$state_total_area * 640)
 }
 
 linear_model_data_broiler = dplyr::select(linear_model_data_broiler, 
@@ -912,7 +979,14 @@ linear_model_data_broiler = dplyr::select(linear_model_data_broiler,
                                         "X2022",
                                         "corn_fraction",
                                         "soy_fraction",
-                                        "alfalfa_fraction")
+                                        "alfalfa_fraction",
+                                        'total_crop',
+                                        'total_crop_fraction',
+                                        'state_total_crop',
+                                        'state_total_alfalfa',
+                                        'state_total_corn',
+                                        'state_total_soy',
+                                        'state_total_fraction')
 colnames(linear_model_data_broiler) = c(  "State", 
                                         "County", 
                                         "surroundingPopulationSummed", 
@@ -1006,7 +1080,14 @@ colnames(linear_model_data_broiler) = c(  "State",
                                         "personalIncome2022",
                                         "corn_fraction",
                                         "soy_fraction",
-                                        "alfalfa_fraction")
+                                        "alfalfa_fraction",
+                                        'total_crop',
+                                        'total_crop_fraction',
+                                        'state_total_crop',
+                                        'state_total_alfalfa',
+                                        'state_total_corn',
+                                        'state_total_soy',
+                                        'state_total_fraction')
 
 write.csv(linear_model_data_broiler, "../Data/Animal Linear Model Data/linear_model_data_broiler.csv", row.names = FALSE)
 
@@ -1094,12 +1175,24 @@ linear_model_data_layer = merge(
   , all = TRUE
   )
 
+# Add state-level totals for area
+linear_model_data_layer <- linear_model_data_layer %>%
+  group_by(state) %>%
+  mutate(
+    state_total_area     = sum(Area..mi.2., na.rm = TRUE)
+  ) %>%
+  ungroup()
+
 # List of crop fraction columns to update
-crop_cols <- c("corn_fraction", "soy_fraction", "alfalfa_fraction")
+crop_cols <- c("corn_fraction", "soy_fraction", "alfalfa_fraction", "total_crop_fraction")
+state_crop_cols <- c("state_total_corn", "state_total_alfalfa", "state_total_soy", "state_total_fraction")
 
 # Apply the formula to each crop column
 for (col in crop_cols) {
   linear_model_data_layer[[col]] <- linear_model_data_layer[[col]] * 0.000247105 * 100 / (linear_model_data_layer$Area..mi.2. * 640)
+}
+for (col in state_crop_cols) {
+  linear_model_data_layer[[col]] <- linear_model_data_layer[[col]] * 0.000247105 * 100 / (linear_model_data_layer$state_total_area * 640)
 }
 
 linear_model_data_layer = dplyr::select(linear_model_data_layer, 
@@ -1196,7 +1289,14 @@ linear_model_data_layer = dplyr::select(linear_model_data_layer,
                                         "X2022",
                                         "corn_fraction",
                                         "soy_fraction",
-                                        "alfalfa_fraction")
+                                        "alfalfa_fraction",
+                                        'total_crop',
+                                        'total_crop_fraction',
+                                        'state_total_crop',
+                                        'state_total_alfalfa',
+                                        'state_total_corn',
+                                        'state_total_soy',
+                                        'state_total_fraction')
 colnames(linear_model_data_layer) = c(  "State", 
                                         "County", 
                                         "surroundingPopulationSummed", 
@@ -1290,7 +1390,14 @@ colnames(linear_model_data_layer) = c(  "State",
                                         "personalIncome2022",
                                         "corn_fraction",
                                         "soy_fraction",
-                                        "alfalfa_fraction")
+                                        "alfalfa_fraction",
+                                        'total_crop',
+                                        'total_crop_fraction',
+                                        'state_total_crop',
+                                        'state_total_alfalfa',
+                                        'state_total_corn',
+                                        'state_total_soy',
+                                        'state_total_fraction')
 
 write.csv(linear_model_data_layer, "../Data/Animal Linear Model Data/linear_model_data_layer.csv", row.names = FALSE)
 
@@ -1375,12 +1482,24 @@ linear_model_data_hog = merge(
   , all = TRUE
   )
 
+# Add state-level totals for area
+linear_model_data_hog <- linear_model_data_hog %>%
+  group_by(state) %>%
+  mutate(
+    state_total_area     = sum(Area..mi.2., na.rm = TRUE)
+  ) %>%
+  ungroup()
+
 # List of crop fraction columns to update
-crop_cols <- c("corn_fraction", "soy_fraction", "alfalfa_fraction")
+crop_cols <- c("corn_fraction", "soy_fraction", "alfalfa_fraction", "total_crop_fraction")
+state_crop_cols <- c("state_total_corn", "state_total_alfalfa", "state_total_soy", "state_total_fraction")
 
 # Apply the formula to each crop column
 for (col in crop_cols) {
   linear_model_data_hog[[col]] <- linear_model_data_hog[[col]] * 0.000247105 * 100 / (linear_model_data_hog$Area..mi.2. * 640)
+}
+for (col in state_crop_cols) {
+  linear_model_data_hog[[col]] <- linear_model_data_hog[[col]] * 0.000247105 * 100 / (linear_model_data_hog$state_total_area * 640)
 }
 
 linear_model_data_hog = dplyr::select(linear_model_data_hog, 
@@ -1477,7 +1596,14 @@ linear_model_data_hog = dplyr::select(linear_model_data_hog,
                                         "X2022",
                                         "corn_fraction",
                                         "soy_fraction",
-                                        "alfalfa_fraction")
+                                        "alfalfa_fraction",
+                                        'total_crop',
+                                        'total_crop_fraction',
+                                        'state_total_crop',
+                                        'state_total_alfalfa',
+                                        'state_total_corn',
+                                        'state_total_soy',
+                                        'state_total_fraction')
 colnames(linear_model_data_hog) = c(  "State", 
                                         "County", 
                                         "surroundingPopulationSummed", 
@@ -1571,7 +1697,14 @@ colnames(linear_model_data_hog) = c(  "State",
                                         "personalIncome2022",
                                         "corn_fraction",
                                         "soy_fraction",
-                                        "alfalfa_fraction")
+                                        "alfalfa_fraction",
+                                        'total_crop',
+                                        'total_crop_fraction',
+                                        'state_total_crop',
+                                        'state_total_alfalfa',
+                                        'state_total_corn',
+                                        'state_total_soy',
+                                        'state_total_fraction')
 
 head(linear_model_data_hog, 10)
 
