@@ -308,7 +308,7 @@ for (i in state_names){
   }
 }
 
-hog_concat = rbind(training_linear_model_data_hog, predicting_hog_data)
+hog_con cat = rbind(training_linear_model_data_hog, predicting_hog_data)
 
 ```
 
@@ -596,6 +596,33 @@ merged_df$totalCount <- rowSums(
 
 ```
 
+```{r}
+sheep_concat_total = dplyr::select(sheep_concat, "State", "County", "sheepCount")
+hog_concat_total = dplyr::select(hog_concat, "State", "County", "hogCount")
+broiler_concat_total = dplyr::select(broiler_concat, "State", "County", "broilerCount")
+layer_concat_total = dplyr::select(layer_concat, "State", "County", "layerCount")
+cattle_concat_total = dplyr::select(cattle_concat, "State", "County", "cattleCount")
+
+# Combining all dataframes
+merged_df <- merge(sheep_concat_total, hog_concat_total, by = c("State", "County"), all = TRUE)
+merged_df <- merge(merged_df, broiler_concat_total, by = c("State", "County"), all = TRUE)
+merged_df <- merge(merged_df, layer_concat_total, by = c("State", "County"), all = TRUE)
+merged_df <- merge(merged_df, cattle_concat_total, by = c("State", "County"), all = TRUE)
+merged_df <- merged_df %>%
+  mutate(
+    weighted_sheep = sheepCount * 0.2,
+    weighted_hog = hogCount * 0.11,
+    weighted_broiler = broilerCount * 0.0022,
+    weighted_layer = layerCount * 0.004,
+    weighted_cattle = cattleCount * 1.135  # Cattle count remains unchanged (no weight given)
+  )
+
+merged_df$totalCount <- rowSums(
+  merged_df[, c("weighted_sheep", "weighted_hog", "weighted_broiler", "weighted_cattle", "weighted_layer")],
+  na.rm = TRUE
+)
+
+```
 
 ```{r}
 counties <- map_data("county")
@@ -641,7 +668,7 @@ p <- ggplot(county_subset_map, aes(long, lat)) +
   geom_polygon(aes(group = group, fill = density_per_km2)) +
   geom_path(data = states, aes(long, lat, group = group), color = "black") +
   coord_map("albers", lat0 = 45.5, lat1 = 29.5) +
-  scale_fill_gradient(limits = c(0, 50), oob = scales::squish) +
+  scale_fill_gradient(limits = c(0, 250), oob = scales::squish) +
   labs(title = "Animal Count Filled - Post Imputation", fill = "Count")
 
 print(p)
@@ -726,7 +753,7 @@ p <- ggplot(county_subset_map, aes(long, lat)) +
 print(p)
 ```
 ```{r}
-merged_df_area <- merged_df_initial %>%
+merged_df_area_initial <- merged_df_initial %>%
   left_join(
     linear_model_data_hog %>% 
       dplyr::select(State, County, Area..mi.2.),
@@ -734,8 +761,28 @@ merged_df_area <- merged_df_initial %>%
   ) %>%
   mutate(
     Area_km2 = Area..mi.2. * 2.58999,
-    density_per_km2 = totalCount / Area_km2
+    density_per_km2 = totalCount_initial / Area_km2
   )
+```
+
+```{r}
+counties <- map_data("county")
+counties$subregion[is.na(counties$subregion)] <- "none"
+counties$subregion <- gsub(" ", "", counties$subregion)
+
+county_subset_map <- merge(counties, merged_df_area_initial, sort = FALSE, by.x = c('region', 'subregion'), by.y = c('State', 'County'), all = TRUE)
+county_subset_map <- county_subset_map[order(county_subset_map$order), ]
+
+plot_title <- gsub("\\.", " ", count_variables["density_per_km2"]) 
+p <- ggplot(county_subset_map, aes(long, lat)) +
+  geom_polygon(aes(group = group, fill = density_per_km2)) +
+  geom_path(data = states, aes(long, lat, group = group), color = "black") +
+  coord_map("albers", lat0 = 45.5, lat1 = 29.5) +
+  scale_fill_gradient(limits = c(0, 400), oob = scales::squish) +
+  labs(title = "Animal Count Filled - Pre Imputation", fill = "Count")
+
+print(p)
+
 ```
 
 ```{r}
@@ -746,7 +793,7 @@ merged_diff <- merge(merged_df_initial, merged_df, by = c("State", "County"))
 merged_diff <- merged_diff %>%
   dplyr::mutate(totalCount_diff = abs(totalCount_initial - totalCount))
 
-print(merged_diff)
+print(merge d_diff)
 
 ```
 

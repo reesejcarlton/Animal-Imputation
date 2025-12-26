@@ -137,6 +137,8 @@ fips_lookup <- fips_codes %>%
     county = tolower(gsub("county", "", county)),
     county = gsub("[[:space:][:punct:]]", "", county)
   )
+fips_lookup <- fips_lookup %>%
+  filter(!county %in% c("bedfordcity", "fairfaxcity", "franklincity", 'richmondcity',"roanokecity"))
 
 
 # Merge CDL pixel counts with cleaned state and county names
@@ -228,6 +230,7 @@ linear_model_data_sheep = merge(
   all = TRUE  
 )
 
+
 linear_model_data_sheep = merge(
   linear_model_data_sheep,
   state_subset,
@@ -278,6 +281,9 @@ linear_model_data_sheep = merge(
   by.y = c('state', 'county')
   , all = TRUE
   )
+
+linear_model_data_sheep <- linear_model_data_sheep[complete.cases(linear_model_data_sheep), ]
+
 
 # Add state-level totals for area
 linear_model_data_sheep <- linear_model_data_sheep %>%
@@ -511,6 +517,15 @@ write.csv(linear_model_data_sheep, "../Data/Animal Linear Model Data/linear_mode
 
 head(linear_model_data_sheep)
 ```
+```{r}
+library(dplyr)
+
+duplicates <- linear_model_data_sheep %>%
+  group_by(State, County) %>%
+  filter(n() > 1) %>%
+  ungroup()
+
+```
 
 
 ```{r}
@@ -586,6 +601,9 @@ linear_model_data_cattle = merge(
   by.y = c('state', 'county')
   , all = TRUE
   )
+
+linear_model_data_cattle <- linear_model_data_cattle[complete.cases(linear_model_data_cattle), ]
+
 
 # List of crop fraction columns to update
 crop_cols <- c("corn_fraction", "soy_fraction", "alfalfa_fraction")
@@ -864,6 +882,9 @@ linear_model_data_broiler = merge(
   by.y = c('state', 'county')
   , all = TRUE
   )
+
+linear_model_data_broiler <- linear_model_data_broiler[complete.cases(linear_model_data_broiler), ]
+
 
 # Add state-level totals for area
 linear_model_data_broiler <- linear_model_data_broiler %>%
@@ -1175,6 +1196,9 @@ linear_model_data_layer = merge(
   , all = TRUE
   )
 
+linear_model_data_layer <- linear_model_data_layer[complete.cases(linear_model_data_layer), ]
+
+
 # Add state-level totals for area
 linear_model_data_layer <- linear_model_data_layer %>%
   group_by(state) %>%
@@ -1481,6 +1505,9 @@ linear_model_data_hog = merge(
   by.y = c('state', 'county')
   , all = TRUE
   )
+
+linear_model_data_hog <- linear_model_data_hog[complete.cases(linear_model_data_hog), ]
+
 
 # Add state-level totals for area
 linear_model_data_hog <- linear_model_data_hog %>%
