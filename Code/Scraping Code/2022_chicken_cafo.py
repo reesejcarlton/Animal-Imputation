@@ -3,7 +3,7 @@ import pdfplumber
 import re 
 import pandas as pd 
 from io import BytesIO 
-url = "https://www.nass.usda.gov/Publications/AgCensus/2022/Full_Report/Volume_1,_Chapter_2_County_Level/California/st06_2_019_019.pdf" # ----------------------------- # 1. Read PDF as text # ----------------------------- 
+url = "https://www.nass.usda.gov/Publications/AgCensus/2022/Full_Report/Volume_1,_Chapter_2_County_Level/Arizona/st04_2_019_019.pdf" # ----------------------------- # 1. Read PDF as text # ----------------------------- 
 response = requests.get(url) 
 pdf_file = BytesIO(response.content) 
 text = "" 
@@ -74,7 +74,7 @@ bin_row_indices = [
 weighted_broiler_total = 0
 
 for row_idx, weight in zip(bin_row_indices, cafoWeights):
-    farms_in_bin = int(lines[row_idx].split()[1].replace(",", ""))
+    farms_in_bin = int(lines[row_idx].split()[1].replace(",", "").replace('-', '0'))
     weighted_broiler_total += farms_in_bin * weight
     
 broilerFactor = state_broiler_count/weighted_broiler_total
@@ -133,12 +133,12 @@ for i in range(len(item_indices)):
     # Layer
     tempLayerIndex = row_numbers_100[i]
     farms_layer = lines[tempLayerIndex].split()[1:]
-    layers_list.append({'farms': farms_layer, 'numbers': [int(i) * 100000 * layerFactor if '-' not in i else i for i in farms_layer]})
+    layers_list.append({'farms': farms_layer, 'numbers': [int(i.replace(",", "")) * 100000 * layerFactor if '-' not in i else i for i in farms_layer]})
 
     # Broiler
     tempBroilerIndex = row_numbers_500[i]
     farms_broiler = lines[tempBroilerIndex].split()[1:]
-    broiler_list.append({'farms': farms_broiler, 'numbers': [int(i) * 500000 / 5.5 * broilerFactor if '-' not in i else i for i in farms_broiler]})
+    broiler_list.append({'farms': farms_broiler, 'numbers': [int(i.replace(",", "")) * 500000 / 5.5 * broilerFactor if '-' not in i else i for i in farms_broiler]})
 
     
 # Now you have two separate lists
