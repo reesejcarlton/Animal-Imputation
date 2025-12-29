@@ -149,3 +149,5 @@ print(finalCattleDf.head())
 print("\nRows:", len(finalCattleDf))
 
 finalCattleDf.to_csv("../../Data/Scraped Data/2022_cafo/2022_cattle_cafo.csv", index=False)
+
+
