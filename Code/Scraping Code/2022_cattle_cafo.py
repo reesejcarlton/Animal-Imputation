@@ -2,6 +2,13 @@ import requests
 import pdfplumber
 import pandas as pd
 from io import BytesIO
+import os
+
+# Get the directory of the current script
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Change the working directory to the script's directory
+os.chdir(script_dir)
 
 # -----------------------------
 # State FIPS codes & names
@@ -109,12 +116,12 @@ def extract_state_data(state_name, fips_code):
         min_len = min(len(countyList), len(beef_farms), len(beef_numbers), len(dry_farms), len(dry_numbers))
 
         df = pd.DataFrame({
-            "State": [state_name] * min_len,
-            "County": countyList[:min_len],
-            "DryFarms": dry_farms[:min_len],
-            "DryNumber": dry_numbers[:min_len],
-            "BeefFarms": beef_farms[:min_len],
-            "BeefNumber": beef_numbers[:min_len]
+            "STATE": [state_name] * min_len,
+            "COUNTY": countyList[:min_len],
+            "DRY2022FAC": dry_farms[:min_len],
+            "DRY2022NUM": dry_numbers[:min_len],
+            "COW2022FAC": beef_farms[:min_len],
+            "COW2022NUM": beef_numbers[:min_len]
         })
 
         print(f"Finished {state_name}")
@@ -140,3 +147,5 @@ finalCattleDf = pd.concat(all_dfs, ignore_index=True)
 print("\nFINAL COMBINED DF:")
 print(finalCattleDf.head())
 print("\nRows:", len(finalCattleDf))
+
+finalCattleDf.to_csv("../../Data/Scraped Data/2022_cafo/2022_cattle_cafo.csv", index=False)

@@ -2,6 +2,13 @@ import requests
 import pdfplumber
 import pandas as pd
 from io import BytesIO
+import os
+
+# Get the directory of the current script
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Change the working directory to the script's directory
+os.chdir(script_dir)
 
 # -----------------------------
 # State FIPS codes & names
@@ -124,3 +131,5 @@ finalHogDf = pd.concat(all_dfs, ignore_index=True)
 print("\nFINAL COMBINED DF:")
 print(finalHogDf.head())
 print("\nRows:", len(finalHogDf))
+
+finalHogDf.to_csv("../../Data/Scraped Data/2022_cafo/2022_hog_cafo.csv", index=False)
