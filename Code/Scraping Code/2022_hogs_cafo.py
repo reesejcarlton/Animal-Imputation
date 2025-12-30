@@ -81,6 +81,7 @@ def extract_state_data(state_name, fips_code):
         # ---------------------
         # Extract data rows
         # ---------------------
+        dFlag = ""
         row_numbers_1000 = [i for i, line in enumerate(lines) if "1,000or" in line]
         row_numbers_hogs = [i for i, line in enumerate(lines) if "Totalhogsandpigs" in line]
         
@@ -102,13 +103,18 @@ def extract_state_data(state_name, fips_code):
         min_len = min(len(countyList), len(hogs_farms), len(hogs_numbers))
         
         df = pd.DataFrame({
-            "State": [state_name] * min_len,
-            "County": countyList[:min_len],
-            "HogsFarms": hogs_farms[:min_len],
-            "HogsNumber": hogs_numbers[:min_len],
+            "STATE": [state_name] * min_len,
+            "COUNTY": countyList[:min_len],
+            "HOG2022FAC": hogs_farms[:min_len],
+            "HOG2022NUM": hogs_numbers[:min_len],
         })
+        
+        if df.iloc[0]["HOG2022NUM"] == "(D)":
+            dFlag += " -> State Hog Count = (D)"
+            mask = df["HOG2022NUM"] == "(D)"
+            df.loc[mask, "HOG2022NUM"] = df.loc[mask, "HOG2022FAC"].astype(float) * 1000
 
-        print(f"Finished {state_name}")
+        print(f"Finished {state_name}" + dFlag)
         return df
 
     except Exception as e:
