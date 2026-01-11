@@ -81,6 +81,7 @@ def extract_state_data(state_name, fips_code):
         # ---------------------
         # Extract data rows
         # ---------------------
+        dFlag = ""
         row_numbers_500 = [i for i, line in enumerate(lines) if "500or" in line]
         row_numbers_beef = [i for i, line in enumerate(lines) if "Cattleandcalves-Con." in line]
         row_numbers_dry = [i for i, line in enumerate(lines) if "Milkcows" in line]
@@ -123,8 +124,22 @@ def extract_state_data(state_name, fips_code):
             "COW2022FAC": beef_farms[:min_len],
             "COW2022NUM": beef_numbers[:min_len]
         })
+        
+        if df.iloc[0]["DRY2022NUM"] == "(D)":
+            dFlag += " -> State Dairy Count = (D)"
+            mask = df["DRY2022NUM"] == "(D)"
+            df.loc[mask, "DRY2022NUM"] = df.loc[mask, "DRY2022FAC"].astype(float) * 500
 
-        print(f"Finished {state_name}")
+        if df.iloc[0]["COW2022NUM"] == "(D)":
+            mask = df["COW2022NUM"] == "(D)"
+            df.loc[mask, "COW2022NUM"] = df.loc[mask, "COW2022FAC"].astype(float) * 500
+            if df.iloc[0]["DRY2022NUM"] == "(D)":
+                dFlag += " and State Beef Count = (D)"
+            else:
+                dFlag += " -> State Beef Count = (D)"
+
+
+        print(f"Finished {state_name}" + dFlag)
         return df
 
     except Exception as e:

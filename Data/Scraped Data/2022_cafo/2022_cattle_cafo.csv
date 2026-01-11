@@ -292,8 +292,8 @@ Connecticut,NewHaven,-,-,-,-
 Connecticut,NewLondon,3,"3,345",-,-
 Connecticut,Tolland,1,(D),-,-
 Connecticut,Windham,1,(D),-,-
-Delaware,Delaware,-,-,1,(D)
-Delaware,Kent,-,-,1,(D)
+Delaware,Delaware,-,-,1,500.0
+Delaware,Kent,-,-,1,500.0
 Delaware,NewCastle,-,-,-,-
 Delaware,Sussex,-,-,-,-
 Florida,Florida,37,"90,224",-,-
@@ -1198,9 +1198,9 @@ Maryland,Talbot,-,-,-,-
 Maryland,Washington,-,-,-,-
 Maryland,Wicomico,-,-,-,-
 Maryland,Worcester,-,-,-,-
-Massachusetts,Massachusetts,1,(D),-,-
+Massachusetts,Massachusetts,1,500.0,-,-
 Massachusetts,Barnstable,-,-,-,-
-Massachusetts,Berkshire,1,(D),-,-
+Massachusetts,Berkshire,1,500.0,-,-
 Massachusetts,Bristol,-,-,-,-
 Massachusetts,Dukes,-,-,-,-
 Massachusetts,Essex,-,-,-,-
@@ -1385,7 +1385,7 @@ Minnesota,Wilkin,-,-,-,-
 Minnesota,Winona,22,"15,752",-,-
 Minnesota,Wright,3,"1,816",5,"3,850"
 Minnesota,YellowMedicine,1,(D),3,"2,175"
-Mississippi,Mississippi,2,(D),-,-
+Mississippi,Mississippi,2,1000.0,-,-
 Mississippi,Adams,-,-,-,-
 Mississippi,Alcorn,-,-,-,-
 Mississippi,Amite,-,-,-,-
@@ -1400,7 +1400,7 @@ Mississippi,Claiborne,-,-,-,-
 Mississippi,Clarke,-,-,-,-
 Mississippi,Clay,-,-,-,-
 Mississippi,Coahoma,-,-,-,-
-Mississippi,Copiah,1,(D),-,-
+Mississippi,Copiah,1,500.0,-,-
 Mississippi,Covington,-,-,-,-
 Mississippi,DeSoto,-,-,-,-
 Mississippi,Forrest,-,-,-,-
@@ -1431,7 +1431,7 @@ Mississippi,Leflore,-,-,-,-
 Mississippi,Lincoln,-,-,-,-
 Mississippi,Lowndes,-,-,-,-
 Mississippi,Madison,-,-,-,-
-Mississippi,Marion,1,(D),-,-
+Mississippi,Marion,1,500.0,-,-
 Mississippi,Marshall,-,-,-,-
 Mississippi,Monroe,-,-,-,-
 Mississippi,Montgomery,-,-,-,-
@@ -1734,7 +1734,7 @@ Nebraska,Wayne,5,(D),1,(D)
 Nebraska,Webster,-,-,1,(D)
 Nebraska,Wheeler,-,-,2,(D)
 Nebraska,York,-,-,7,"24,184"
-Nevada,Nevada,11,"30,463",1,(D)
+Nevada,Nevada,11,"30,463",1,500.0
 Nevada,Churchill,9,(D),-,-
 Nevada,Clark,-,-,-,-
 Nevada,Douglas,-,-,-,-
@@ -1744,7 +1744,7 @@ Nevada,Eureka,-,-,-,-
 Nevada,Humboldt,-,-,-,-
 Nevada,Lander,-,-,-,-
 Nevada,Lincoln,-,-,-,-
-Nevada,Lyon,1,(D),1,(D)
+Nevada,Lyon,1,(D),1,500.0
 Nevada,Mineral,-,-,-,-
 Nevada,Nye,1,(D),-,-
 Nevada,Pershing,-,-,-,-
@@ -1763,7 +1763,7 @@ New_Hampshire,Merrimack,-,-,-,-
 New_Hampshire,Rockingham,-,-,-,-
 New_Hampshire,Strafford,-,-,-,-
 New_Hampshire,Sullivan,2,(D),-,-
-New_Jersey,NewJersey,1,(D),-,-
+New_Jersey,NewJersey,1,500.0,-,-
 New_Jersey,Atlantic,-,-,-,-
 New_Jersey,Bergen,-,-,-,-
 New_Jersey,Burlington,-,-,-,-
@@ -1771,7 +1771,7 @@ New_Jersey,Camden,-,-,-,-
 New_Jersey,CapeMay,-,-,-,-
 New_Jersey,Cumberland,-,-,-,-
 New_Jersey,Essex,-,-,-,-
-New_Jersey,Gloucester,1,(D),-,-
+New_Jersey,Gloucester,1,500.0,-,-
 New_Jersey,Hudson,-,-,-,-
 New_Jersey,Hunterdon,-,-,-,-
 New_Jersey,Mercer,-,-,-,-
@@ -2810,7 +2810,7 @@ Utah,Wasatch,-,-,-,-
 Utah,Washington,-,-,1,(D)
 Utah,Wayne,-,-,-,-
 Utah,Weber,1,(D),-,-
-Vermont,Vermont,58,"62,657",1,(D)
+Vermont,Vermont,58,"62,657",1,500.0
 Vermont,Addison,23,"24,578",-,-
 Vermont,Bennington,-,-,-,-
 Vermont,Caledonia,2,(D),-,-
@@ -2818,7 +2818,7 @@ Vermont,Chittenden,-,-,-,-
 Vermont,Essex,-,-,-,-
 Vermont,Franklin,15,"16,301",-,-
 Vermont,GrandIsle,3,"2,600",-,-
-Vermont,Lamoille,1,(D),1,(D)
+Vermont,Lamoille,1,(D),1,500.0
 Vermont,Orange,4,"4,219",-,-
 Vermont,Orleans,5,"8,849",-,-
 Vermont,Rutland,-,-,-,-
@@ -3093,7 +3093,7 @@ Wisconsin,Waupaca,27,"20,358",3,"1,650"
 Wisconsin,Waushara,3,"4,185",1,(D)
 Wisconsin,Winnebago,10,"11,494",3,"2,850"
 Wisconsin,Wood,8,"5,786",1,(D)
-Wyoming,Wyoming,2,(D),15,"60,708"
+Wyoming,Wyoming,2,1000.0,15,"60,708"
 Wyoming,Albany,-,-,1,(D)
 Wyoming,BigHorn,-,-,1,(D)
 Wyoming,Campbell,-,-,-,-
@@ -3104,11 +3104,11 @@ Wyoming,Fremont,-,-,1,(D)
 Wyoming,Goshen,-,-,6,"41,489"
 Wyoming,HotSprings,-,-,-,-
 Wyoming,Johnson,-,-,-,-
-Wyoming,Laramie,1,(D),4,"9,955"
+Wyoming,Laramie,1,500.0,4,"9,955"
 Wyoming,Lincoln,-,-,-,-
 Wyoming,Natrona,-,-,1,(D)
 Wyoming,Niobrara,-,-,-,-
-Wyoming,Park,1,(D),-,-
+Wyoming,Park,1,500.0,-,-
 Wyoming,Platte,-,-,-,-
 Wyoming,Sheridan,-,-,-,-
 Wyoming,Sublette,-,-,-,-
