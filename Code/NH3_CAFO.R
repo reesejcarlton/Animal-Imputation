@@ -7,11 +7,11 @@ library(scales)
 # -----------------------------
 # Read NH3 data
 # -----------------------------
-nh3_df <- read_excel("/Users/benjohnson/Downloads/conus_nh3_countavg_june_aug_2021_2023 (1).xls") %>%
+nh3_df <- read.csv("../Data/conus_nh3.csv") %>%
   transmute(
     lon = as.numeric(Longitude),
     lat = as.numeric(Latitude),
-    nh3 = as.numeric(`NH3 column`)
+    nh3 = as.numeric(`NH3.column`)
   ) %>%
   filter(
     !is.na(nh3),
@@ -28,8 +28,6 @@ q
 # Basemap
 # -----------------------------
 states <- map_data("state")
-
-
 # -----------------------------
 # Yellow → orange → red palette
 # (matched to your density maps)
@@ -56,45 +54,65 @@ scale_color_gradientn(
   name    = expression(NH[3]~"column")
 )
 
-
 # -----------------------------
-# Plot
+# Hex map
 # -----------------------------
-plot_title <- "CONUS NH\u2083 Column"
 
-p.nh3 <- ggplot() +
-  geom_polygon(
+p_nh3_hex <- ggplot(nh3_df, aes(lon, lat)) +
+  stat_summary_hex(
+    aes(z = nh3, fill = after_stat(value)),
+    fun = median,
+    bins = 50,   # adjust for coarser/finer hexes
+    alpha = 1
+  ) +
+  geom_path(
     data = states,
     aes(long, lat, group = group),
-    fill = NA,
+    inherit.aes = FALSE,
     color = "black",
     linewidth = 0.3
   ) +
-  geom_point(
-    data = nh3_df,
-    aes(lon, lat, color = nh3),
-    size = 1.6,
-    alpha = 0.8
-  ) +
   coord_map("albers", lat0 = 45.5, lat1 = 29.5) +
-  scale_color_gradientn(
-    colours = ylow_orange_red_NH3,
-    trans   = "log10",
-    breaks  = c(3e14, 1e15, 3e15, 1e16),
-    labels  = label_scientific(),
-    name    = expression(NH[3]~"column")
+  scale_fill_gradientn(
+    colours = c(
+      "#fffffb",
+      "#fffff0",
+      "#ffffe5",
+      "#fff7bc",
+      "#fec44f",
+      "#fe9929",
+      "#f16913",
+      "#d7301f"
+    ),
+    # trans = scales::trans_new(
+    #   "log1p10",
+    #   transform = function(x) log10(x + 1),
+    #   inverse   = function(x) (10^x) - 1
+    # ),
+    oob = scales::squish,
+    breaks = scales::pretty_breaks(n = 5),
+    # labels = function(x) {
+    #   s <- formatC(x, format = "e", digits = 2)          # e.g. "1.00e+15"
+    #   s <- gsub("e([+-]?)(\\d+)", " %*% 10^\\1\\2", s)   # -> "1.00 %*% 10^15"
+    #   s <- gsub("\\^\\+", "^", s)                        # clean + sign
+    #   parse(text = s)
+    # },
+    name = expression(paste("NH"[3], " Column")),
+    guide = guide_colorbar(
+      title.position = "top",
+      title.hjust = 0.5,
+      barheight = grid::unit(190, "pt"),
+      ticks = TRUE
+    )
   ) +
-  guides(color = guide_colorbar(
-    barheight = unit(55, "mm"),
-    barwidth  = unit(10, "mm")
-  )) +
-  labs(title = plot_title) +
+  labs(title = expression(paste("CONUS NH"[3], " Column"))) +
   theme_void() +
   theme(
-    plot.title   = element_text(face = "bold"),
-    legend.title = element_text(face = "bold"),
-    legend.text  = element_text(size = 10)
+    legend.key.height = grid::unit(18, "pt"),
+    legend.text = element_text(size = 10),
+    legend.title = element_text(size = 11),
+    legend.box.margin = margin(0, 0, 0, 8)
   )
 
-print(p.nh3)
+print(p_nh3_hex)
 
