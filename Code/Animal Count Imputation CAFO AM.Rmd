@@ -825,7 +825,7 @@ merged_diff <- merge(merged_df_initial, merged_df, by = c("State", "County"))
 merged_diff <- merged_diff %>%
   dplyr::mutate(totalCount_diff = abs(totalCount_initial - totalCount))
 
-print(merge d_diff)
+print(merged_diff)
 
 ```
 
