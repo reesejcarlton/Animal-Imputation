@@ -26,7 +26,6 @@ usda_cafo_2022_cleaned = usda_cafo_2022.drop(['STATE', 'COUNTY', 'STATE_y', 'COU
 usda_cafo_2022_cleaned = usda_cafo_2022_cleaned.rename(columns = ({'STATE_x':'STATE', 'COUNTY_x':'COUNTY'}))
 
 usda_cafo_2022_cleaned.iloc[:, 2:] = usda_cafo_2022_cleaned.iloc[:, 2:].replace('(D)', -47)
-usda_cafo_2022_cleaned.iloc[:, 2:] = usda_cafo_2022_cleaned.iloc[:, 2:].replace('-',pd.NA)
+usda_cafo_2022_cleaned.iloc[:, 2:] = usda_cafo_2022_cleaned.iloc[:, 2:].replace('-',pd.NA).replace(',', '', regex=True).apply(pd.to_numeric, errors='coerce').round(0)
 
-usda_cafo_2022_cleaned.iloc[:, 2:] = usda_cafo_2022_cleaned.iloc[:, 2:].apply(lambda col: pd.to_numeric(col.str.replace(',', ''), errors='coerce'))
 usda_cafo_2022_cleaned.to_csv("../../Data/Scraped Data/2022_cafo/usda_cafo_2022_cleaned.csv", index=False)

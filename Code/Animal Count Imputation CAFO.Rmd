@@ -349,7 +349,7 @@ print(p)
 
 ```{r}
 #Read in csv files
-linear_model_data_broiler = read.csv("../Data/Animal Linear Model Data/linear_model_data_broiler.csv")
+linear_model_data_broiler = read.csv("../Data/Animal Linear Model Data/linear_model_data_broiler_cafo.csv")
 linear_model_data_broiler <- na.omit(linear_model_data_broiler)
 
 broiler_concat = linear_model_data_broiler
@@ -366,7 +366,7 @@ p <- ggplot(county_subset_map_cattle, aes(long, lat)) +
   geom_polygon(aes(group = group, fill = get("broilerCount"))) +
   geom_path(data = states, aes(long, lat, group = group), color = "black") +
   coord_map("albers",  lat0 = 45.5, lat1 = 29.5) +
-  labs(title = "cattle Count Filled", fill = "Count")  
+  labs(title = "Broiller Count Filled", fill = "Count")  
 
 print(p)
 ```
@@ -392,7 +392,7 @@ p <- ggplot(county_subset_map_cattle, aes(long, lat)) +
   geom_polygon(aes(group = group, fill = get("layerCount"))) +
   geom_path(data = states, aes(long, lat, group = group), color = "black") +
   coord_map("albers",  lat0 = 45.5, lat1 = 29.5) +
-  labs(title = "cattle Count Filled", fill = "Count")  
+  labs(title = "Layer Count Filled", fill = "Count")  
 
 print(p)
 ```
